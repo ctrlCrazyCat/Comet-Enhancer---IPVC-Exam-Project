@@ -5,7 +5,7 @@ class Tooltip:
     Classe Tooltip rivista con logica di attivazione/disattivazione 
     basata sullo stato 'is_enabled' per evitare problemi di unbind.
     """
-    def __init__(self, widget, text):
+    def __init__(self, widget, text,tooltip_enabled = True):
         self.widget = widget
         self.text = text
         self.tw = None
@@ -21,7 +21,9 @@ class Tooltip:
         self.widget.bind("<Enter>", self.schedule)
         self.widget.bind("<Leave>", self.hide)
         self.widget.bind("<ButtonPress>", self.hide)
-        #self.disable()
+        if not tooltip_enabled:
+            self.hide() # Assicura che la finestra sia chiusa
+            self.is_enabled = False
         
     def unschedule(self, event=None):
         """Cancella il timer pendente (se presente)."""

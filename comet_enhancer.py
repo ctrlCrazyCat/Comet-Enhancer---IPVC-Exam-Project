@@ -16,18 +16,20 @@ matplotlib.use('TkAgg')
 from tooltip import Tooltip
 
 #TODO change conditional_config to modify the info color
-def conditional_config(entry_widget_info,condition:bool):
+def conditional_config(entry_widget_info,configuration):
+        (condition,text) = configuration
         entry_widget_info.config(fg='green')
         if not condition:
             entry_widget_info.config(fg='red')
-def _get_info_label(frame):
+        entry_widget_info.tooltip.text = text
+def _get_info_label(frame,tooltip_enabled = False):
     out = tk.Label(frame, text="l",font=tkFont.Font(family="Wingdings", size=10, weight="bold"),fg="gray")
-    out.tooltip= Tooltip(out,"")
+    out.tooltip= Tooltip(out,"",tooltip_enabled)
     return out
 
-def _get_custom_entry(frame,text_variable,text_shown):
+def _get_custom_entry(frame,text_variable,text_shown,tooltip_enabled = False):
     out = tk.Entry(frame, textvariable=text_variable, width=15, state=tk.DISABLED)
-    out.info_label = _get_info_label(frame)
+    out.info_label = _get_info_label(frame,tooltip_enabled)
     out.info_label.pack(side=tk.LEFT)
     tk.Label(frame, text=text_shown).pack(side=tk.LEFT)
     out.pack(side=tk.LEFT)
@@ -165,14 +167,14 @@ class ImageProcessingGUI:
                 "variable": self.rho_pixels_var
             },
             "theta_pixels": {
-                "label": tk.Label(self.conditional_params_frame, text="Number di pixel asse θ:"), 
+                "label": tk.Label(self.conditional_params_frame, text="Numero di pixel asse θ:"), 
                 "info_label":_get_info_label(self.conditional_params_frame),
                 "widget": tk.Entry(self.conditional_params_frame, textvariable=self.theta_pixels_var, width=20),
                 "variable": self.theta_pixels_var
             },
             "std_dev_theta": {
                 "label": tk.Label(self.conditional_params_frame, text="Quante deviazioni standard dovrebbero essere accettate per i pixel asse θ?"), 
-                "info_label":_get_info_label(self.conditional_params_frame),
+                "info_label":_get_info_label(self.conditional_params_frame,tooltip_enabled=True),
                 "widget": tk.Entry(self.conditional_params_frame, textvariable=self.std_dev_theta_var, width=20),
                 "variable": self.std_dev_theta_var
             },
@@ -317,6 +319,11 @@ class ImageProcessingGUI:
 
                 # Resetta e aggiorna lo stato dei campi condizionali
                 self._update_conditional_fields()
+                for e in self.all_entries:
+                    e.info_label.tooltip.enable()
+
+                #TODO : RENDERE i tooltip dei condizionali sempre enabled
+                #e gestirli a livello di informazioni
 
                 self._validate_all_inputs() # Forza una validazione completa
             except Exception as e:
@@ -390,6 +397,9 @@ class ImageProcessingGUI:
         self.ymin_var.set("")
         self.ymax_var.set("")
 
+        for e in self.all_entries:
+            e.info_label.config(fg='gray')
+            e.info_label.tooltip.disable()
         # Aggiorna lo stato dei campi condizionali
         self._update_conditional_fields()
 
@@ -397,26 +407,26 @@ class ImageProcessingGUI:
         self._validate_all_inputs() # Forza una validazione completa
 
 
-    def _validate_double_input(self, value_str, min_val=None, max_val=None, allow_zero=True):
+    def _validate_double_input(self, value_var, min_val=None, max_val=None, allow_zero=True):
         """
         Valida se una stringa è un double e rientra nel range specificato.
         Se allow_zero è False, il valore deve essere > 0.
         """
-        if not value_str: return False
+        value_str = value_var.get()
+        if not value_str: return (False,"è assente")
         try:
             val = float(value_str)
             if not allow_zero and val <= 0:
-                return False
+                return (False,"è minore o uguale a zero")
             
-            is_in_range = True
-            if min_val is not None:
-                is_in_range = is_in_range and val >= min_val
-            if max_val is not None:
-                is_in_range = is_in_range and val <= max_val
+            if min_val is not None and val < min_val:
+                return (False,"è minore di "+str(min_val))
+            if max_val is not None and val > max_val:
+                return (False,"è maggiore di "+str(max_val))
             
-            return is_in_range
+            return (True,"correttamente inserito")
         except ValueError:
-            return False
+            return (False,"non rappresenta un numero a virgola mobile")
 
     def _validate_int_input_and_approximate(self, value_var, min_val=1, max_val=None):
         """
@@ -425,7 +435,7 @@ class ImageProcessingGUI:
         Aggiorna la StringVar con l'intero approssimato.
         """
         value_str = value_var.get()
-        if not value_str: return False
+        if not value_str: return (False,"è assente")
 
         try:
             temp_val = float(value_str)
@@ -435,22 +445,24 @@ class ImageProcessingGUI:
             # Questo controllo è per assicurarsi che l'utente inserisca numeri interi per campi int
             # ma permette la digitazione temporanea di decimali (es. "12." o "12.0")
             if abs(temp_val - int_val) > 1e-9: # Piccola tolleranza per float comparison
-                 return False
+                 return (False,"non rappresenta un numero intero")
             
             # Solo aggiorna se il valore effettivo della StringVar è diverso
             if value_var.get() != str(int_val):
                 value_var.set(str(int_val)) 
 
-            is_in_range = int_val >= min_val
-            if max_val is not None:
-                is_in_range = is_in_range and int_val <= max_val
+            if min_val is not None and int_val < min_val:
+                return (False,"è minore di "+str(min_val))
+            if max_val is not None and int_val > max_val:
+                return (False,"è maggiore di "+str(max_val))
+                
             
-            return is_in_range
+            return (True,"correttamente inserito")
         except ValueError:
-            return False
+            return (False,"non rappresenta un numero intero")
     
     #TODO: PARAMS --> WRAPPER
-    def _validate_all_inputs(self, *args):
+    def _validate_all_inputs(self, *args):#TODO: da rivedere
         """Funzione principale di validazione che gestisce lo stato di tutti i widget."""
         # args è presente qui a causa dei trace callback, ma non viene usato
         self.validations = Params
@@ -462,10 +474,10 @@ class ImageProcessingGUI:
             return
 
         # Validazione dei campi principali (Centro e Limiti)
-        center_x_ok = self._validate_double_input(self.center_x_var.get(), min_val=1, max_val=self.image_width)
+        center_x_ok = self._validate_double_input(self.center_x_var, min_val=1, max_val=self.image_width)
         all_ok.append(center_x_ok)
-        center_y_ok = self._validate_double_input(self.center_y_var.get(), min_val=1, max_val=self.image_height)
-        all_center_ok = center_x_ok and center_y_ok
+        center_y_ok = self._validate_double_input(self.center_y_var, min_val=1, max_val=self.image_height)
+        all_center_ok = center_x_ok[0] and center_y_ok[0]
         all_ok.append(center_y_ok)
         self.validations.all_center_ok = all_center_ok
         if all_center_ok:
@@ -485,7 +497,7 @@ class ImageProcessingGUI:
         all_ok.append(ymin_ok)
         ymax_ok = self._validate_int_input_and_approximate(self.ymax_var, min_val=1, max_val=self.image_height)
         all_ok.append(ymax_ok)
-        all_limits_ok = xmin_ok and xmax_ok and ymin_ok and ymax_ok
+        all_limits_ok = xmin_ok[0] and xmax_ok[0] and ymin_ok[0] and ymax_ok[0]
         
 
         for i, entry_widget in enumerate(self.all_entries):
@@ -497,12 +509,12 @@ class ImageProcessingGUI:
         if all_limits_ok:
             x_min_max_ok = (int(self.xmin_var.get()) < int(self.xmax_var.get()))
             if not x_min_max_ok:
-                conditional_config(self.entry_xmax.info_label,False)
-                conditional_config(self.entry_xmin.info_label,False)
+                conditional_config(self.entry_xmax.info_label,(False,"Limite superiore X minore o uguale al limite inferiore"))
+                conditional_config(self.entry_xmin.info_label,(False,"X Min >= X Max"))
             y_min_max_ok=(int(self.ymin_var.get()) < int(self.ymax_var.get()))
             if not y_min_max_ok:
-                conditional_config(self.entry_ymax.info_label,False)
-                conditional_config(self.entry_ymin.info_label,False)
+                conditional_config(self.entry_ymax.info_label,(False,"Y Max <= Y Min"))
+                conditional_config(self.entry_ymin.info_label,(False,"Y Min >= Y Max"))
             min_max_ok = x_min_max_ok and y_min_max_ok
             self.validations.min_max_ok = min_max_ok
 
@@ -541,7 +553,7 @@ class ImageProcessingGUI:
             theta_pixels_ok = self._validate_int_input_and_approximate(self.theta_pixels_var, min_val=1)
             conditional_config(self.conditional_widgets_map["theta_pixels"]["info_label"],theta_pixels_ok)
              
-            std_dev_theta_ok= self._validate_double_input(self.std_dev_theta_var.get(),min_val=0)
+            std_dev_theta_ok= self._validate_double_input(self.std_dev_theta_var,min_val=0)
             conditional_config(self.conditional_widgets_map["std_dev_theta"]["info_label"],std_dev_theta_ok)            
             all_conditional_ok = rho_pixels_ok and theta_pixels_ok and std_dev_theta_ok
             self.validations.option = 0
@@ -569,9 +581,9 @@ class ImageProcessingGUI:
             conditional_config(self.conditional_widgets_map["rho_pixels"]["info_label"],rho_pixels_ok)
             theta_pixels_ok = self._validate_int_input_and_approximate(self.theta_pixels_var, min_val=1)
             conditional_config(self.conditional_widgets_map["theta_pixels"]["info_label"],theta_pixels_ok)
-            std_dev_theta_ok = self._validate_double_input(self.std_dev_theta_var.get(), min_val=-1e-15, allow_zero=True)
+            std_dev_theta_ok = self._validate_double_input(self.std_dev_theta_var, min_val=-1e-15, allow_zero=True)
             conditional_config(self.conditional_widgets_map["std_dev_theta"]["info_label"],std_dev_theta_ok)
-            min_max_std_dev_ok = self._validate_double_input(self.min_max_std_dev_var.get(), min_val=-1e-15, allow_zero=True)
+            min_max_std_dev_ok = self._validate_double_input(self.min_max_std_dev_var, min_val=-1e-15, allow_zero=True)
             conditional_config(self.conditional_widgets_map["min_max_std_dev"]["info_label"],min_max_std_dev_ok)
             all_conditional_ok = rho_pixels_ok and theta_pixels_ok and std_dev_theta_ok and min_max_std_dev_ok
 
@@ -585,13 +597,13 @@ class ImageProcessingGUI:
 
 
         elif selected_option == self.options[4]: # Radially Variable Spatial Filtering
-            kernel_a_ok = self._validate_double_input(self.kernel_a_term_var.get(),min_val=0, allow_zero=False)
+            kernel_a_ok = self._validate_double_input(self.kernel_a_term_var,min_val=0, allow_zero=False)
             conditional_config(self.conditional_widgets_map["kernel_a_term"]["info_label"],kernel_a_ok)
 
-            kernel_b_ok = self._validate_double_input(self.kernel_b_term_var.get(),min_val=0, allow_zero=False)
+            kernel_b_ok = self._validate_double_input(self.kernel_b_term_var,min_val=0, allow_zero=False)
             conditional_config(self.conditional_widgets_map["kernel_b_term"]["info_label"],kernel_b_ok)
 
-            kernel_n_ok = self._validate_double_input(self.kernel_n_term_var.get(),min_val=0, allow_zero=False)
+            kernel_n_ok = self._validate_double_input(self.kernel_n_term_var,min_val=0, allow_zero=False)
             conditional_config(self.conditional_widgets_map["kernel_n_term"]["info_label"],kernel_n_ok)
 
             all_conditional_ok = kernel_a_ok and kernel_b_ok and kernel_n_ok
@@ -624,77 +636,6 @@ class ImageProcessingGUI:
         self._validate_all_inputs() # Forza una validazione completa
 
 
-    # def is_all_data_valid(self):
-    #     """Controlla se tutti i dati necessari (inclusi i condizionali) sono validi."""
-    #     # Questa funzione è ridondante con _validate_all_inputs se chiamata solo per il submit,
-    #     # ma la manteniamo per chiarezza se volessi riutilizzarla altrove.
-    #     # In pratica, se il bottone submit è abilitato, significa che _validate_all_inputs
-    #     # ha già determinato che i dati sono validi.
-    #     if not self.image_path:
-    #         return False
-
-    #     main_valid = self._validate_center_inputs() and self._validate_limit_inputs()
-    #     if not main_valid:
-    #         return False
-
-    #     selected_option = self.combobox_choice.get()
-        
-    #     if selected_option == self.options[0]: # Division by Azimuthal Average
-    #         rho_pixels_ok = self._validate_int_input_and_approximate(self.rho_pixels_var, min_val=1)
-    #         theta_pixels_ok = self._validate_int_input_and_approximate(self.theta_pixels_var, min_val=1)
-    #         std_dev_theta_valid = self._validate_double_input(self.std_dev_theta_var.get(), min_val=1, allow_zero=False)
-    #         return rho_pixels_ok and theta_pixels_ok and std_dev_theta_valid
-        
-    #     elif selected_option == self.options[1] or selected_option == self.options[3]: # Azimuthal Median / Division by 1/rho profile
-    #         rho_pixels_ok = self._validate_int_input_and_approximate(self.rho_pixels_var, min_val=1)
-    #         theta_pixels_ok = self._validate_int_input_and_approximate(self.theta_pixels_var, min_val=1)
-    #         return rho_pixels_ok and theta_pixels_ok
-        
-    #     elif selected_option == self.options[2]: # Azimuthal Renormalization
-    #         rho_pixels_ok = self._validate_int_input_and_approximate(self.rho_pixels_var, min_val=1)
-    #         theta_pixels_ok = self._validate_int_input_and_approximate(self.theta_pixels_var, min_val=1)
-    #         std_dev_theta_valid = self._validate_double_input(self.std_dev_theta_var.get(), min_val=1, allow_zero=False)
-    #         min_max_std_dev_valid = self._validate_double_input(self.min_max_std_dev_var.get(), min_val=1, allow_zero=False)
-    #         return rho_pixels_ok and theta_pixels_ok and std_dev_theta_valid and min_max_std_dev_valid
-        
-    #     elif selected_option == self.options[4]: # Radially Variable Spatial Filtering
-    #         kernel_a_ok = self._validate_double_input(self.kernel_a_term_var.get(), allow_zero=True)
-    #         kernel_b_ok = self._validate_double_input(self.kernel_b_term_var.get(), allow_zero=True)
-    #         kernel_n_ok = self._validate_double_input(self.kernel_n_term_var.get(), allow_zero=True)
-    #         return kernel_a_ok and kernel_b_ok and kernel_n_ok
-            
-    #     else:
-    #         return True
-
-    # def _validate_center_inputs(self):
-    #     """Valida i valori X e Y del centro."""
-    #     if self.image_width == 0 or self.image_height == 0:
-    #         return False 
-    #     valid_x = self._validate_double_input(self.center_x_var.get(), min_val=1, max_val=self.image_width)
-    #     valid_y = self._validate_double_input(self.center_y_var.get(), min_val=1, max_val=self.image_height)
-    #     return valid_x and valid_y
-
-    # def _validate_limit_inputs(self):
-    #     """Valida i valori di X e Y min/max e le relazioni min <= max."""
-    #     if self.image_width == 0 or self.image_height == 0:
-    #         return False
-
-    #     valid_xmin = self._validate_int_input_and_approximate(self.xmin_var, min_val=1, max_val=self.image_width)
-    #     valid_xmax = self._validate_int_input_and_approximate(self.xmax_var, min_val=1, max_val=self.image_width)
-    #     valid_ymin = self._validate_int_input_and_approximate(self.ymin_var, min_val=1, max_val=self.image_height)
-    #     valid_ymax = self._validate_int_input_and_approximate(self.ymax_var, min_val=1, max_val=self.image_height)
-
-    #     if not (valid_xmin and valid_xmax and valid_ymin and valid_ymax):
-    #         return False
-
-    #     try:
-    #         xmin = int(self.xmin_var.get())
-    #         xmax = int(self.xmax_var.get())
-    #         ymin = int(self.ymin_var.get())
-    #         ymax = int(self.ymax_var.get())
-    #         return xmin <= xmax and ymin <= ymax
-    #     except ValueError: # Questo dovrebbe essere già gestito da _validate_int_input_and_approximate
-    #         return False
     def _get_deep_info_on_double_value(self,value_str,min_val=None,max_val=None,allow_zero=True):
         if not value_str: return "è assente"
         try:
@@ -739,26 +680,26 @@ class ImageProcessingGUI:
         detail_string=""
         if not self.validations.main_inputs_valid:
             if not self.validations.all_center_ok:
-                if not self.validations.center_x_ok:
+                if not self.validations.center_x_ok[0]:
                     detail_string = detail_string + "-Centro X "+self._get_deep_info_on_double_value(self.center_x_var.get(),min_val=1,max_val=self.image_width)+"\n"
-                if not self.validations.center_y_ok:
+                if not self.validations.center_y_ok[0]:
                     detail_string = detail_string + "-Centro Y "+self._get_deep_info_on_double_value(self.center_y_var.get(),min_val=1,max_val=self.image_height)+"\n"
             if not self.validations.all_limits_ok:
                 detail_string = detail_string+"\n"
-                if not self.validations.xmin_ok:
+                if not self.validations.xmin_ok[0]:
                     detail_string = detail_string + "-X Min "+self._get_deep_info_on_int_value(self.xmin_var.get(),min_val=1,max_val=self.image_width)+"\n"
-                if not self.validations.xmax_ok:
+                if not self.validations.xmax_ok[0]:
                     detail_string = detail_string + "-X Max "+self._get_deep_info_on_int_value(self.xmax_var.get(),min_val=1,max_val=self.image_width)+"\n"
-                if not self.validations.ymin_ok:
+                if not self.validations.ymin_ok[0]:
                     detail_string = detail_string + "-Y min "+self._get_deep_info_on_int_value(self.ymin_var.get(),min_val=1,max_val=self.image_height)+"\n"
-                if not self.validations.ymax_ok:
+                if not self.validations.ymax_ok[0]:
                     detail_string = detail_string + "-Y max "+self._get_deep_info_on_int_value(self.ymax_var.get(),min_val=1,max_val=self.image_height)+"\n"
             else:
                 if not self.validations.min_max_ok:
                     detail_string = detail_string+"\n"
-                    if not self.validations.x_min_max_ok:
+                    if not self.validations.x_min_max_ok[0]:
                         detail_string = detail_string + "-X Min >= X Max\n"
-                    if not self.validations.y_min_max_ok:
+                    if not self.validations.y_min_max_ok[0]:
                         detail_string = detail_string + "-Y Min >= Y Max\n"
         if not self.validations.all_conditional_ok:
             detail_string = detail_string+"\n"
@@ -814,7 +755,7 @@ if __name__ == "__main__":
     root.resizable(False, False)
     app = ImageProcessingGUI(root)
     while True:
-        #app.submitted_successfully=False
+        app.submitted_successfully=False
         app.run()
         
         # --- Recupero dei valori dopo che la GUI è stata chiusa (dal submit) ---
