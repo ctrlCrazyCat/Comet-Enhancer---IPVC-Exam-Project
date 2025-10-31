@@ -13,75 +13,7 @@ import matplotlib
 import sys
 matplotlib.use('TkAgg')
 
-
-
-class Tooltip:
-    """
-    Classe per creare un widget Tooltip (nuvola messaggio) che appare
-    quando il mouse si ferma sopra un altro widget.
-    """
-    def __init__(self, widget, text):
-        self.widget = widget
-        self.text = text
-        self.tw = None  # Variabile per la finestra Tooltip
-        self.id = None  # ID del job/timer per ritardare la comparsa
-        self.delay = 1000  # Ritardo in millisecondi (0.5 secondi)
-
-        # Lega gli eventi di ingresso e uscita del mouse al widget principale
-        self.widget.bind("<Enter>", self.schedule)
-        self.widget.bind("<Leave>", self.hide)
-        self.widget.bind("<ButtonPress>", self.hide) # Nasconde al click
-
-    def schedule(self, event=None):
-        """Pianifica la comparsa del tooltip dopo un breve ritardo."""
-        # Se c'è già un timer, lo annulla
-        self.unschedule()
-        # Avvia un timer (job) per chiamare show dopo self.delay
-        self.id = self.widget.after(self.delay, self.show)
-
-    def unschedule(self):
-        """Cancella il timer pendente (se presente)."""
-        if self.id:
-            self.widget.after_cancel(self.id)
-            self.id = None
-
-    def show(self, event=None):
-        """Crea e mostra la finestra pop-up del tooltip."""
-        # Previene la creazione di doppioni
-        if self.tw:
-            return
-
-        # 1. Calcola la posizione
-        # ottiene la posizione x, y del widget + la sua altezza
-        x = self.widget.winfo_rootx() + 20 # 20px di offset a destra
-        y = self.widget.winfo_rooty() + self.widget.winfo_height() + 1
-
-        # 2. Crea la finestra Tooltip (Toplevel)
-        self.tw = tk.Toplevel(self.widget)
-        # Rimuove la decorazione della finestra (bordi, barra del titolo)
-        self.tw.wm_overrideredirect(True)
-        # Posiziona la finestra
-        self.tw.wm_geometry(f"+{x}+{y}")
-        
-        # 3. Aggiunge il testo
-        label = tk.Label(self.tw, 
-                         text=self.text, 
-                         justify='left',
-                         background="#ffffe0", # Colore di sfondo giallo chiaro tipico
-                         relief='solid', 
-                         borderwidth=1,
-                         font=("tahoma", "8", "normal"))
-        label.pack(ipadx=1)
-
-    def hide(self, event=None):
-        """Nasconde e distrugge la finestra del tooltip."""
-        # Prima annulla il timer se il mouse è uscito prima della comparsa
-        self.unschedule()
-        
-        # Se la finestra è visibile, la distrugge
-        if self.tw:
-            self.tw.destroy()
-        self.tw = None
+from tooltip import Tooltip
 
 
 def conditional_config(entry_widget,condition:bool):
@@ -914,7 +846,7 @@ if __name__ == "__main__":
     root.resizable(False, False)
     app = ImageProcessingGUI(root)
     while True:
-        app.submitted_successfully=False
+        #app.submitted_successfully=False
         app.run()
         
         # --- Recupero dei valori dopo che la GUI è stata chiusa (dal submit) ---
@@ -975,15 +907,20 @@ if __name__ == "__main__":
                 print(f"  Kernel N Term: {float(app.kernel_n_term_var.get())}")
                 print(f"  Transform Log: {app.transform_log_var.get()}")
                 o.imn = comet_pack.radially_variable_spatial_filtering(o.imold,o.A,o.B,o.N,o.NUMLOG,o.xnuc,o.ynuc,o.x_lower_lim,o.x_upper_lim,o.y_lower_lim,o.y_upper_lim)
-            # app.submit_button.config(state=tk.DISABLED) 
+            app.submit_button.config(state=tk.DISABLED) 
             comet_pack.interactive_image_viewer(o)
-            # try:
-            #     app.submit_button.config(state=tk.NORMAL)
-            # except tk.TclError as e:
-            #     if "application has been destroyed" in str(e):
-            #         pass
-            #     else:
-            #         raise
+            #TODO: GESTIRE ERRORE DI CHIUSURA APP PRIMA DEL VISUALIZZATORE
+            #ho notato che se si chiama interactive_image_viewer senza cambiare stato al bottone
+            #l'applicazione continua a lavorare
+            #magari si può gestire la chiamata all'elaborazione direttamente dalla funzione del bottone
+            #così da rendere il flusso dell'applicazione indipendente dal resto
+
+
+            try:
+                app.submit_button.config(state=tk.NORMAL)
+            except tk.TclError as e:
+                print("\nL'utente ha chiuso la finestra")
+                sys.exit()
             
             
             
