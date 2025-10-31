@@ -15,7 +15,6 @@ matplotlib.use('TkAgg')
 
 from tooltip import Tooltip
 
-#TODO change conditional_config to modify the info color
 def conditional_config(entry_widget_info,configuration):
         (condition,text) = configuration
         entry_widget_info.config(fg='green')
@@ -162,13 +161,13 @@ class ImageProcessingGUI:
         self.conditional_widgets_map = {
             "rho_pixels": {
                 "label": tk.Label(self.conditional_params_frame, text="Numero di pixel asse ρ (rho):"), 
-                "info_label":_get_info_label(self.conditional_params_frame),
+                "info_label":_get_info_label(self.conditional_params_frame,tooltip_enabled=True),
                 "widget": tk.Entry(self.conditional_params_frame, textvariable=self.rho_pixels_var, width=20),
                 "variable": self.rho_pixels_var
             },
             "theta_pixels": {
                 "label": tk.Label(self.conditional_params_frame, text="Numero di pixel asse θ:"), 
-                "info_label":_get_info_label(self.conditional_params_frame),
+                "info_label":_get_info_label(self.conditional_params_frame,tooltip_enabled=True),
                 "widget": tk.Entry(self.conditional_params_frame, textvariable=self.theta_pixels_var, width=20),
                 "variable": self.theta_pixels_var
             },
@@ -180,35 +179,36 @@ class ImageProcessingGUI:
             },
             "min_max_std_dev": {
                 "label": tk.Label(self.conditional_params_frame, text="How many standard deviations from the mean should\nthe minimum and maximum pixel values be?"), 
-                "info_label":_get_info_label(self.conditional_params_frame),
+                "info_label":_get_info_label(self.conditional_params_frame,tooltip_enabled=True),
                 "widget": tk.Entry(self.conditional_params_frame, textvariable=self.min_max_std_dev_var, width=20),
                 "variable": self.min_max_std_dev_var
             },
             "kernel_a_term": {
                 "label": tk.Label(self.conditional_params_frame, text="valore Kernel A (double):"), 
-                "info_label":_get_info_label(self.conditional_params_frame),
+                "info_label":_get_info_label(self.conditional_params_frame,tooltip_enabled=True),
                 "widget": tk.Entry(self.conditional_params_frame, textvariable=self.kernel_a_term_var, width=20),
                 "variable": self.kernel_a_term_var
             },
             "kernel_b_term": {
                 "label": tk.Label(self.conditional_params_frame, text="valore Kernel B (double):"), 
-                "info_label":_get_info_label(self.conditional_params_frame),
+                "info_label":_get_info_label(self.conditional_params_frame,tooltip_enabled=True),
                 "widget": tk.Entry(self.conditional_params_frame, textvariable=self.kernel_b_term_var, width=20),
                 "variable": self.kernel_b_term_var
             },
             "kernel_n_term": {
                 "label": tk.Label(self.conditional_params_frame, text="valore Kernel N (double):"), 
-                "info_label":_get_info_label(self.conditional_params_frame),
+                "info_label":_get_info_label(self.conditional_params_frame,tooltip_enabled=True),
                 "widget": tk.Entry(self.conditional_params_frame, textvariable=self.kernel_n_term_var, width=20),
                 "variable": self.kernel_n_term_var
             },
             "transform_log": {
                 "label": tk.Label(self.conditional_params_frame, text="Trasformare l'immagine input in scala log-10 prima di migliorarla?"), 
-                "info_label":_get_info_label(self.conditional_params_frame),
+                "info_label":_get_info_label(self.conditional_params_frame,tooltip_enabled=True),
                 "widget": tk.Checkbutton(self.conditional_params_frame, variable=self.transform_log_var, text="Sì"),
                 "variable": self.transform_log_var
             }
         }
+        #TODO: CREARE UN CONDITIONAL CONFIG SOLO PER RHO PIXEL
 
         # Mappa le opzioni ai widget necessari e alla loro riga di griglia
         self.option_to_widgets_config = {
@@ -461,7 +461,7 @@ class ImageProcessingGUI:
         except ValueError:
             return (False,"non rappresenta un numero intero")
     
-    #TODO: PARAMS --> WRAPPER
+    
     def _validate_all_inputs(self, *args):#TODO: da rivedere
         """Funzione principale di validazione che gestisce lo stato di tutti i widget."""
         # args è presente qui a causa dei trace callback, ma non viene usato
@@ -545,7 +545,7 @@ class ImageProcessingGUI:
         
         
         selected_option = self.combobox_choice.get()
-        #TODO: OTTIMIZZARE QUI IL CODICE
+        #TODO: VEDERE SE SI PUO OTTIMIZZARE QUI IL CODICE
         # Validazione dei campi condizionali attualmente visibili
         if selected_option == self.options[0]: # Division by Azimuthal Average
             rho_pixels_ok = self._validate_int_input_and_approximate(self.rho_pixels_var, min_val=1,max_val=self.rho_max)
@@ -555,7 +555,7 @@ class ImageProcessingGUI:
              
             std_dev_theta_ok= self._validate_double_input(self.std_dev_theta_var,min_val=0)
             conditional_config(self.conditional_widgets_map["std_dev_theta"]["info_label"],std_dev_theta_ok)            
-            all_conditional_ok = rho_pixels_ok and theta_pixels_ok and std_dev_theta_ok
+            all_conditional_ok = rho_pixels_ok[0] and theta_pixels_ok[0] and std_dev_theta_ok[0]
             self.validations.option = 0
             self.validations.all_conditional_ok = all_conditional_ok
             if not all_conditional_ok:
@@ -568,7 +568,7 @@ class ImageProcessingGUI:
             conditional_config(self.conditional_widgets_map["rho_pixels"]["info_label"],rho_pixels_ok)
             theta_pixels_ok = self._validate_int_input_and_approximate(self.theta_pixels_var, min_val=1)
             conditional_config(self.conditional_widgets_map["theta_pixels"]["info_label"],theta_pixels_ok)
-            all_conditional_ok = rho_pixels_ok and theta_pixels_ok
+            all_conditional_ok = rho_pixels_ok[0] and theta_pixels_ok[0]
             self.validations.option = 1
             self.validations.all_conditional_ok = all_conditional_ok
             if not all_conditional_ok:
@@ -585,7 +585,7 @@ class ImageProcessingGUI:
             conditional_config(self.conditional_widgets_map["std_dev_theta"]["info_label"],std_dev_theta_ok)
             min_max_std_dev_ok = self._validate_double_input(self.min_max_std_dev_var, min_val=-1e-15, allow_zero=True)
             conditional_config(self.conditional_widgets_map["min_max_std_dev"]["info_label"],min_max_std_dev_ok)
-            all_conditional_ok = rho_pixels_ok and theta_pixels_ok and std_dev_theta_ok and min_max_std_dev_ok
+            all_conditional_ok = rho_pixels_ok[0] and theta_pixels_ok[0] and std_dev_theta_ok[0] and min_max_std_dev_ok[0]
 
             self.validations.option = 2
             self.validations.all_conditional_ok = all_conditional_ok
@@ -606,7 +606,7 @@ class ImageProcessingGUI:
             kernel_n_ok = self._validate_double_input(self.kernel_n_term_var,min_val=0, allow_zero=False)
             conditional_config(self.conditional_widgets_map["kernel_n_term"]["info_label"],kernel_n_ok)
 
-            all_conditional_ok = kernel_a_ok and kernel_b_ok and kernel_n_ok
+            all_conditional_ok = kernel_a_ok[0] and kernel_b_ok[0] and kernel_n_ok[0]
 
             self.validations.option = 4
             self.validations.all_conditional_ok = all_conditional_ok
@@ -635,103 +635,64 @@ class ImageProcessingGUI:
         self._update_conditional_fields() # Aggiorna la visibilità e lo stato dei campi
         self._validate_all_inputs() # Forza una validazione completa
 
-
-    def _get_deep_info_on_double_value(self,value_str,min_val=None,max_val=None,allow_zero=True):
-        if not value_str: return "è assente"
-        try:
-            val = float(value_str)
-            if not allow_zero and val <= 0:
-                return "è minore o uguale a zero"
-            
-            is_in_range = True
-            if min_val is not None:
-                is_in_range = is_in_range and val >= min_val
-            if not is_in_range:
-                return "è minore di "+str(min_val)
-            if max_val is not None:
-                is_in_range = is_in_range and val <= max_val
-            if not is_in_range:
-                return "è maggiore di "+str(max_val)
-
-        except ValueError:
-            return "non rappresenta un numero a virgola mobile"
-        
-    def _get_deep_info_on_int_value(self,value_str,min_val=None,max_val=None,allow_zero=True):
-        if not value_str: return "è assente"
-        try:
-            val = int(value_str)
-            if not allow_zero and val <= 0:
-                return "è minore o uguale a zero"
-            
-            is_in_range = True
-            if min_val is not None:
-                is_in_range = is_in_range and val >= min_val
-            if not is_in_range:
-                return "è minore di "+str(min_val)
-            if max_val is not None:
-                is_in_range = is_in_range and val <= max_val
-            if not is_in_range:
-                return "è maggiore di "+str(max_val)
-
-        except ValueError:
-            return "non rappresenta un numero intero"
     
     def _data_warning(self):
         detail_string=""
         if not self.validations.main_inputs_valid:
             if not self.validations.all_center_ok:
                 if not self.validations.center_x_ok[0]:
-                    detail_string = detail_string + "-Centro X "+self._get_deep_info_on_double_value(self.center_x_var.get(),min_val=1,max_val=self.image_width)+"\n"
+                    detail_string = detail_string + "-Centro X "+self.validations.center_x_ok[1]+"\n"
                 if not self.validations.center_y_ok[0]:
-                    detail_string = detail_string + "-Centro Y "+self._get_deep_info_on_double_value(self.center_y_var.get(),min_val=1,max_val=self.image_height)+"\n"
+                    detail_string = detail_string + "-Centro Y "+self.validations.center_y_ok[1]+"\n"
             if not self.validations.all_limits_ok:
                 detail_string = detail_string+"\n"
                 if not self.validations.xmin_ok[0]:
-                    detail_string = detail_string + "-X Min "+self._get_deep_info_on_int_value(self.xmin_var.get(),min_val=1,max_val=self.image_width)+"\n"
+                    detail_string = detail_string + "-X Min "+self.validations.xmin_ok[1]+"\n"
                 if not self.validations.xmax_ok[0]:
-                    detail_string = detail_string + "-X Max "+self._get_deep_info_on_int_value(self.xmax_var.get(),min_val=1,max_val=self.image_width)+"\n"
+                    detail_string = detail_string + "-X Max "+self.validations.xmax_ok[1]+"\n"
                 if not self.validations.ymin_ok[0]:
-                    detail_string = detail_string + "-Y min "+self._get_deep_info_on_int_value(self.ymin_var.get(),min_val=1,max_val=self.image_height)+"\n"
+                    detail_string = detail_string + "-Y min "+self.validations.ymin_ok[1]+"\n"
                 if not self.validations.ymax_ok[0]:
-                    detail_string = detail_string + "-Y max "+self._get_deep_info_on_int_value(self.ymax_var.get(),min_val=1,max_val=self.image_height)+"\n"
+                    detail_string = detail_string + "-Y max "+self.validations.ymax_ok[1]+"\n"
             else:
                 if not self.validations.min_max_ok:
                     detail_string = detail_string+"\n"
-                    if not self.validations.x_min_max_ok[0]:
+                    if not self.validations.x_min_max_ok:
                         detail_string = detail_string + "-X Min >= X Max\n"
-                    if not self.validations.y_min_max_ok[0]:
+                    if not self.validations.y_min_max_ok:
                         detail_string = detail_string + "-Y Min >= Y Max\n"
+        #TODO: VEDERE SE SI PUO OTTIMIZZARE IL CODICE ANCHE QUI
         if not self.validations.all_conditional_ok:
             detail_string = detail_string+"\n"
             match self.validations.option:
                 case 0:
-                    if not self.validations.rho_pixels_ok:
-                        detail_string = detail_string + "-Numero di pixel asse ρ (rho) "+self._get_deep_info_on_int_value(self.rho_pixels_var.get(),min_val=1,max_val=self.rho_max)+"\n"
-                    if not self.validations.theta_pixels_ok:
-                        detail_string = detail_string + "-Numero di pixel asse θ "+self._get_deep_info_on_int_value(self.theta_pixels_var.get(),min_val=1)+"\n"
-                    if not self.validations.std_dev_theta_ok:
-                        detail_string = detail_string + "-Deviazioni standard  pixel asse θ "+self._get_deep_info_on_double_value(self.std_dev_theta_var.get(),min_val=0)+"\n"
+                    if not self.validations.rho_pixels_ok[0]:
+                        detail_string = detail_string + "-Numero di pixel asse ρ (rho) "+self.validations.rho_pixels_ok[1]+"\n"
+                    if not self.validations.theta_pixels_ok[0]:
+                        detail_string = detail_string + "-Numero di pixel asse θ "+self.validations.theta_pixels_ok[1]+"\n"
+                    if not self.validations.std_dev_theta_ok[0]:
+                        detail_string = detail_string + "-Deviazioni standard  pixel asse θ "+self.validations.std_dev_theta_ok[1]+"\n"
                 case 1:
-                    if not self.validations.rho_pixels_ok:
-                        detail_string = detail_string + "-Numero di pixel asse ρ (rho) "+self._get_deep_info_on_int_value(self.rho_pixels_var.get(),min_val=1,max_val=self.rho_max)+"\n"
-                    if not self.validations.theta_pixels_ok:
-                        detail_string = detail_string + "-Numero di pixel asse θ "+self._get_deep_info_on_int_value(self.theta_pixels_var.get(),min_val=1)+"\n"
+                    if not self.validations.rho_pixels_ok[0]:
+                        detail_string = detail_string + "-Numero di pixel asse ρ (rho) "+self.validations.rho_pixels_ok[1]+"\n"
+                    if not self.validations.theta_pixels_ok[0]:
+                        detail_string = detail_string + "-Numero di pixel asse θ "+self.validations.theta_pixels_ok[1]+"\n"
                 case 2:
-                    if not self.validations.rho_pixels_ok:
-                        detail_string = detail_string + "-Numero di pixel asse ρ (rho) "+self._get_deep_info_on_int_value(self.rho_pixels_var.get(),min_val=1,max_val=self.rho_max)+"\n"
-                    if not self.validations.theta_pixels_ok:
-                        detail_string = detail_string + "-Numero di pixel asse θ "+self._get_deep_info_on_int_value(self.theta_pixels_var.get(),min_val=1)+"\n"
-                    if not self.validations.std_dev_theta_ok:
-                        detail_string = detail_string + "-Deviazioni standard pixel asse θ "+self._get_deep_info_on_double_value(self.std_dev_theta_var.get(),min_val=0)+"\n"
-                    if not self.validations.min_max_std_dev_ok:
-                        detail_string = detail_string + "-Deviazioni standard pixel asse θ "+self._get_deep_info_on_double_value(self.min_max_std_dev_var.get(),min_val=0)+"\n"
+                    if not self.validations.rho_pixels_ok[0]:
+                        detail_string = detail_string + "-Numero di pixel asse ρ (rho) "+self.validations.rho_pixels_ok[1]+"\n"
+                    if not self.validations.theta_pixels_ok[0]:
+                        detail_string = detail_string + "-Numero di pixel asse θ "+self.validations.theta_pixels_ok[1]+"\n"
+                    if not self.validations.std_dev_theta_ok[0]:
+                        detail_string = detail_string + "-Deviazioni standard pixel asse θ "+self.validations.std_dev_theta_ok[1]+"\n"
+                    if not self.validations.min_max_std_dev_ok[0]:
+                        detail_string = detail_string + "-Deviazioni standard pixel asse θ "+self.validations.min_max_std_dev_ok[1]+"\n"
                 case 4:
-                    if not self.validations.kernel_a_ok:
-                        detail_string = detail_string + "valore Kernel A "+self._get_deep_info_on_double_value(self.kernel_a_term_var.get(),min_val=0,allow_zero=False)+"\n"
-                    if not self.validations.kernel_b_ok:
-                        detail_string = detail_string + "valore Kernel B "+self._get_deep_info_on_double_value(self.kernel_b_term_var.get(),min_val=0,allow_zero=False)+"\n"
-                    if not self.validations.kernel_n_ok:
-                        detail_string = detail_string + "valore Kernel N "+self._get_deep_info_on_double_value(self.kernel_n_term_var.get(),min_val=0,allow_zero=False)+"\n"
+                    if not self.validations.kernel_a_ok[0]:
+                        detail_string = detail_string + "valore Kernel A "+self.validations.kernel_a_ok[1]+"\n"
+                    if not self.validations.kernel_b_ok[0]:
+                        detail_string = detail_string + "valore Kernel B "+self.validations.kernel_b_ok[1]+"\n"
+                    if not self.validations.kernel_n_ok[0]:
+                        detail_string = detail_string + "valore Kernel N "+self.validations.kernel_n_ok[1]+"\n"
 
         messagebox.showwarning("ATTENZIONE","Dati errati o mancanti\nElaborazione non possibile",detail=detail_string)
     

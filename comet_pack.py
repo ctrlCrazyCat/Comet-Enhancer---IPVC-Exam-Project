@@ -461,7 +461,7 @@ def radially_variable_spatial_filtering(imold,A,B,N,NUMLOG,xnuc,ynuc,xmin,xmax,y
 
 
 
-
+#TODO: GESTIRE CASO IMMAGINE MONOCOLORE (DATAMAX == DATAMIN)
 def interactive_image_viewer(p:Params, gamma_step=0.05):
     """
     Mostra un'immagine astronomica in modo interattivo con controlli per lo stretching 
@@ -624,25 +624,11 @@ def interactive_image_viewer(p:Params, gamma_step=0.05):
 
 def save_enhanced_image(p:Params):
     print()
-    # directory_path="./enhanced_images"
-    # if not os.path.exists(directory_path):
-    #     # Se non esiste, crea la directory.
-    #     # 'os.makedirs' gestisce anche la creazione di eventuali 
-    #     # cartelle intermedie se non esistono (ricorsivamente).
-    #     try:
-    #         os.makedirs(directory_path)
-    #         print(f"Directory '{directory_path}' creata con successo.")
-    #     except OSError as e:
-    #         print(f"Errore nella creazione della directory '{directory_path}': {e}")
-    # else:
-    #     print(f"Directory '{directory_path}' esiste già.")
     directory_path = os.path.basename(p.input_path)
     temp = p.input_path.split('.',1)
     print(temp)
     extension = temp[1]
     name=temp[0]
-    #name = name.split('/')
-    #name = name[-1]
     print(name,extension)
     out_path_recommended = name+"_enhanced"+"_"+p.option
     if p.option == OPTIONS[0]:
