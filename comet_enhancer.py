@@ -22,7 +22,7 @@ def conditional_config(entry_widget_info,configuration):
             entry_widget_info.config(fg='red')
         entry_widget_info.tooltip.text = text
 def _get_info_label(frame,tooltip_enabled = False):
-    out = tk.Label(frame, text="l",font=tkFont.Font(family="Wingdings", size=10, weight="bold"),fg="gray")
+    out = tk.Label(frame, text="l",font=tkFont.Font(family="Wingdings", size=12, weight="bold"),fg="gray")
     out.tooltip= Tooltip(out,"",tooltip_enabled)
     return out
 
@@ -203,7 +203,7 @@ class ImageProcessingGUI:
             },
             "transform_log": {
                 "label": tk.Label(self.conditional_params_frame, text="Trasformare l'immagine input in scala log-10 prima di migliorarla?"), 
-                "info_label":_get_info_label(self.conditional_params_frame,tooltip_enabled=True),
+                "info_label":_get_info_label(self.conditional_params_frame),
                 "widget": tk.Checkbutton(self.conditional_params_frame, variable=self.transform_log_var, text="Sì"),
                 "variable": self.transform_log_var
             }
@@ -322,9 +322,6 @@ class ImageProcessingGUI:
                 for e in self.all_entries:
                     e.info_label.tooltip.enable()
 
-                #TODO : RENDERE i tooltip dei condizionali sempre enabled
-                #e gestirli a livello di informazioni
-
                 self._validate_all_inputs() # Forza una validazione completa
             except Exception as e:
                 messagebox.showerror("Errore Caricamento Immagine", f"Impossibile caricare l'immagine: {e}")
@@ -347,7 +344,7 @@ class ImageProcessingGUI:
             
             if isinstance(widget, tk.Entry):
                 widget.config(state=tk.DISABLED)
-                variable.set("") # Resetta la StringVar
+                #variable.set("") # Resetta la StringVar
             elif isinstance(widget, tk.Checkbutton):
                 widget.config(state=tk.DISABLED)
                 variable.set(False) # Resetta BooleanVar
@@ -510,11 +507,11 @@ class ImageProcessingGUI:
             x_min_max_ok = (int(self.xmin_var.get()) < int(self.xmax_var.get()))
             if not x_min_max_ok:
                 conditional_config(self.entry_xmax.info_label,(False,"Limite superiore X minore o uguale al limite inferiore"))
-                conditional_config(self.entry_xmin.info_label,(False,"X Min >= X Max"))
+                conditional_config(self.entry_xmin.info_label,(False,"Limite inferiore X maggiore o uguale al limite superiore"))
             y_min_max_ok=(int(self.ymin_var.get()) < int(self.ymax_var.get()))
             if not y_min_max_ok:
-                conditional_config(self.entry_ymax.info_label,(False,"Y Max <= Y Min"))
-                conditional_config(self.entry_ymin.info_label,(False,"Y Min >= Y Max"))
+                conditional_config(self.entry_ymax.info_label,(False,"Limite superiore Y minore o uguale al limite inferiore"))
+                conditional_config(self.entry_ymin.info_label,(False,"Limite inferiore X maggiore o uguale al limite superiore"))
             min_max_ok = x_min_max_ok and y_min_max_ok
             self.validations.min_max_ok = min_max_ok
 
@@ -662,6 +659,7 @@ class ImageProcessingGUI:
                     if not self.validations.y_min_max_ok:
                         detail_string = detail_string + "-Y Min >= Y Max\n"
         #TODO: VEDERE SE SI PUO OTTIMIZZARE IL CODICE ANCHE QUI
+
         if not self.validations.all_conditional_ok:
             detail_string = detail_string+"\n"
             match self.validations.option:
@@ -758,8 +756,8 @@ if __name__ == "__main__":
                     imien = comet_pack.azimuthal_median_division(imiun)
                     o.imn=comet_pack.reconstruct_from_polar(imien,o.NCOL,o.NROW,o.xnuc,o.ynuc,o.x_lower_lim,o.x_upper_lim,o.y_lower_lim,o.y_upper_lim)
                 else: #3 DIV RHO
-                    o.imn=comet_pack.rho_division(o.imold,o.xnuc,o.ynuc,o.x_lower_lim,o.x_upper_lim,o.y_lower_lim,o.y_upper_lim)
-                
+                    o.imn=comet_pack.enhance_inverserho_vectorized(o.imold,o.xnuc,o.ynuc,o.x_lower_lim,o.x_upper_lim,o.y_lower_lim,o.y_upper_lim)
+                    
             elif selected_option == app.options[2]:#RENORMALIZATION
                 print(f"  Rho Pixels: {int(app.rho_pixels_var.get())}")
                 print(f"  Theta Pixels: {int(app.theta_pixels_var.get())}")
@@ -777,7 +775,8 @@ if __name__ == "__main__":
                 print(f"  Kernel N Term: {float(app.kernel_n_term_var.get())}")
                 print(f"  Transform Log: {app.transform_log_var.get()}")
                 o.imn = comet_pack.radially_variable_spatial_filtering(o.imold,o.A,o.B,o.N,o.NUMLOG,o.xnuc,o.ynuc,o.x_lower_lim,o.x_upper_lim,o.y_lower_lim,o.y_upper_lim)
-            app.submit_button.config(state=tk.DISABLED) 
+            app.submit_button.config(state=tk.DISABLED)
+            print("SHAPE USCITA",o.imn.shape) 
             comet_pack.interactive_image_viewer(o)
             #TODO: GESTIRE ERRORE DI CHIUSURA APP PRIMA DEL VISUALIZZATORE
             #ho notato che se si chiama interactive_image_viewer senza cambiare stato al bottone

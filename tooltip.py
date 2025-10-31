@@ -10,7 +10,7 @@ class Tooltip:
         self.text = text
         self.tw = None
         self.id = None
-        self.delay = 1000
+        self.delay = 500
         self.is_enabled = True # Stato di attivazione/disattivazione
 
         # E' fondamentale che i metodi 'schedule' e 'hide' siano definiti
@@ -77,12 +77,12 @@ class Tooltip:
         """Disattiva temporaneamente il tooltip."""
         self.hide() # Assicura che la finestra sia chiusa
         self.is_enabled = False
-        print(f"Tooltip per {self.widget} disattivato.")
+        #print(f"Tooltip per {self.widget} disattivato.")
 
     def enable(self):
         """Riattiva il tooltip."""
         self.is_enabled = True
-        print(f"Tooltip per {self.widget} riattivato.")
+        #print(f"Tooltip per {self.widget} riattivato.")
         
     def destroy_tooltip(self):
         """Rimuove permanentemente il tooltip."""

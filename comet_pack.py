@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from matplotlib.widgets import RangeSlider,Button
 from matplotlib.cm import get_cmap
 import tkinter as tk
-from tkinter import filedialog as fd
+from tkinter import filedialog as fd,messagebox
 TWOPI = 2*np.pi
 
 class Params:
@@ -34,7 +34,99 @@ def get_input_data(filepath):
     
     return hdul,imold
 
+def enhance_inverserho_vectorized(imold: np.ndarray, xnuc: float, ynuc: float,xmin:int,xmax:int,ymin:int,ymax:int) -> np.ndarray:
+    """
+    Esegue il miglioramento "inverserho" (moltiplicazione per rho) su un'immagine.
+    
+    Questa funzione replica la logica del programma Fortran 'cometcief_inverserho':
+    1. Rinormalizza l'immagine di input per avere una media di 100.0.
+    2. Calcola la distanza media 'rho' da un ottocentro (xnuc, ynuc)
+       per ogni pixel, utilizzando una media di 10x10 sotto-punti pixel.
+    3. Moltiplica l'immagine rinormalizzata per la mappa di 'rho' media.
 
+    Args:
+        imold (np.ndarray): L'immagine di input 2D come array NumPy.
+        xnuc (float): La coordinata X (colonna) 0-based dell'ottocentro.
+        ynuc (float): La coordinata Y (riga) 0-based dell'ottocentro.
+
+    Returns:
+        np.ndarray: L'immagine migliorata 'imnew'.
+    """
+    
+    # 0. Ottieni le dimensioni dell'immagine
+    (NROW, NCOL) = imold.shape
+
+    # -----------------------------------------------------------------
+    # FASE 1: Rinormalizzazione (come nei loop Fortran 100-101)
+    # -----------------------------------------------------------------
+    
+    # Calcola la media dell'intera immagine
+    avepix = np.mean(imold)
+    
+    # Gestione di un'immagine completamente nera per evitare la divisione per zero
+    if avepix == 0:
+        # Se l'immagine è vuota, il risultato è vuoto
+        return np.zeros_like(imold)
+        
+    # Calcola il fattore di rinormalizzazione per portare la media a 100.0
+    renorm = 100.0 / avepix
+    
+    # Applica la rinormalizzazione
+    aarray_renorm = imold * renorm
+
+    # -----------------------------------------------------------------
+    # FASE 2: Moltiplicazione per Rho (come nei loop Fortran 202-220)
+    # -----------------------------------------------------------------
+
+    # 2a. Crea griglie di coordinate per i CENTRI di ogni pixel
+    # y_coords va da 0 a NROW-1
+    # x_coords va da 0 a NCOL-1
+    y_coords, x_coords = np.indices((NROW, NCOL))
+
+    # 2b. Calcola la distanza dal nucleo al CENTRO di ogni pixel
+    # Questo corrisponde a 'x = xnuc - float(jx)' e 'y = ynuc - float(iy)'
+    x_dist_centers = xnuc - x_coords
+    y_dist_centers = ynuc - y_coords
+
+    # 2c. Definisci il vettore di offset sub-pixel 10x10
+    # Fortran: -0.55 + (0.1 * float(ii)) con ii da 1 a 10
+    # Questo genera: [-0.45, -0.35, ..., +0.35, +0.45]
+    sub_offsets = np.linspace(-0.45, 0.45, 10)
+
+    # 2d. Calcola rho per tutti i 100 sotto-punti di OGNI pixel
+    # Usiamo il broadcasting di NumPy per evitare loop
+    
+    # Espandi le distanze dei centri e gli offset
+    # x_dist_centers (NROW, NCOL) -> (NROW, NCOL, 1)
+    # y_dist_centers (NROW, NCOL) -> (NROW, NCOL, 1)
+    # sub_offsets (10,)
+    
+    # x_sub_grid avrà forma (NROW, NCOL, 10, 1)
+    # y_sub_grid avrà forma (NROW, NCOL, 1, 10)
+    x_sub_grid = x_dist_centers[..., np.newaxis, np.newaxis] + sub_offsets[np.newaxis, :]
+    y_sub_grid = y_dist_centers[..., np.newaxis, np.newaxis] + sub_offsets[:, np.newaxis]
+
+    # Tramite broadcasting, x_sub_grid e y_sub_grid creano una
+    # griglia 10x10 di coordinate (xnew, ynew) per ogni pixel (NROW, NCOL)
+    
+    # Calcola rho per tutti i 100 sotto-punti.
+    # rho_sub_pixels avrà forma (NROW, NCOL, 10, 10)
+    rho_sub_pixels = np.sqrt(x_sub_grid**2 + y_sub_grid**2)
+
+    # 2e. Calcola il rho MEDIO per ogni pixel
+    # (corrisponde a 'rho = rho * 0.01' dopo la somma)
+    # rho_mean avrà forma (NROW, NCOL)
+    rho_mean = np.mean(rho_sub_pixels, axis=(-2, -1))
+
+    # -----------------------------------------------------------------
+    # FASE 3: Applica il Miglioramento
+    # -----------------------------------------------------------------
+    
+    # Moltiplica l'immagine rinormalizzata per la mappa del rho medio
+    imn= aarray_renorm * rho_mean
+    print("IMN SHAPE",imn.shape)
+    print("LIMITI: ",ymin,ymax,xmin,xmax)
+    return imn[ymin:ymax,xmin:xmax]
 
 def rho_division(imold,xnuc:float,ynuc:float,xmin:int,xmax:int,ymin:int,ymax:int):
     (NROW,NCOL) = imold.shape
@@ -249,7 +341,7 @@ def reconstruct_from_polar(imien,NCOL:int,NROW:int,xnuc:float,ynuc:float,xmin:in
     # Assegnazione finale a imn
     # cvect_sum_all ha la forma (lcol, lrow), che è esattamente quella che vogliamo per imn
     imn = cvect_sum_all * 0.01
-    return imn[ymin:ymax-1,xmin:xmax-1]
+    return imn[ymin:ymax,xmin:xmax]
 
 
 
@@ -343,13 +435,13 @@ def polarize(imold,nrad,ntheta,xnuc:float,ynuc:float):
 
     # Inizialmente tutti i valori calcolati
     imiun = calculated_avect_values
-
+    
     # Se almeno un sotto-punto non è valido, imposta l'intero blocco (i, j) a -1.0
     imiun[~all_subpoints_valid_per_ij] = -1.0
 
     # Gestione della condizione avect[j] < 1e-5
     small_value_mask = (imiun < 1e-5) & (imiun != -1.0)
-    imiun[small_value_mask] = -1.0e-5
+    imiun[small_value_mask] = -1
     return imiun
 
 def radially_variable_spatial_filtering(imold,A,B,N,NUMLOG,xnuc,ynuc,xmin,xmax,ymin,ymax):
@@ -475,6 +567,18 @@ def interactive_image_viewer(p:Params, gamma_step=0.05):
     # Rimuovi i valori NaN e assicurati che i dati siano float32
     data = cv2.flip(p.imn.astype(np.float32),0)
     data[np.isnan(data)] = np.min(data[~np.isnan(data)])
+
+    # --- Calcolo Range Iniziale ---
+    data_min = np.min(data)
+    data_max = np.max(data)
+
+    print('data_min',data_min,'data_max',data_max)
+
+    if not(data_max>data_min):
+        messagebox.showwarning("Attenzione","L'elaborazione ha prodotto un'immagine monocromatica")
+        plt.imshow(data,'gray')
+        plt.show()
+        return
     
     # --- Variabili di Stato Locali ---
     # Usiamo un wrapper per tenere traccia dello stato di Gamma
@@ -485,17 +589,10 @@ def interactive_image_viewer(p:Params, gamma_step=0.05):
     state = State()
     
 
-    # --- Calcolo Range Iniziale ---
-    data_min = np.min(data)
-    data_max = np.max(data)
-
-    print('data_min',data_min,'data_max',data_max)
+    
     
 
-    # --- Funzioni di Elaborazione (Nested) ---
-    if not(data_max>data_min):
-        print('AAAA')
-    
+    # --- Funzioni di Elaborazione (Nested) ---    
     def normalizza_immagine( min_val, max_val):
         """Esegue il clipping e lo stretching lineare [min_val, max_val] -> [0.0, 1.0]."""
         
@@ -644,8 +741,8 @@ def save_enhanced_image(p:Params):
 
     
 
-    root = tk.Tk()
-    root.withdraw() # Nasconde la finestra principale vuota
+    #root = tk.Tk()
+    #root.withdraw() # Nasconde la finestra principale vuota
 
     # 2. Definisci i tipi di file filtrabili
     filetypes = [("Immagini FITS", "*.fit *.fits")] 
