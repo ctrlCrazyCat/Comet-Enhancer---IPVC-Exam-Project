@@ -21,6 +21,7 @@ class Tooltip:
         self.widget.bind("<Enter>", self.schedule)
         self.widget.bind("<Leave>", self.hide)
         self.widget.bind("<ButtonPress>", self.hide)
+        #self.disable()
         
     def unschedule(self, event=None):
         """Cancella il timer pendente (se presente)."""

@@ -15,13 +15,24 @@ matplotlib.use('TkAgg')
 
 from tooltip import Tooltip
 
-
-def conditional_config(entry_widget,condition:bool):
-        entry_widget.config(bg='white',fg='green')
+#TODO change conditional_config to modify the info color
+def conditional_config(entry_widget_info,condition:bool):
+        entry_widget_info.config(fg='green')
         if not condition:
-            entry_widget.config(bg='red',fg='white')
+            entry_widget_info.config(fg='red')
 def _get_info_label(frame):
-    return tk.Label(frame, text="D",font=tkFont.Font(family="Wingdings", size=20, weight="bold"),fg='red')
+    out = tk.Label(frame, text="l",font=tkFont.Font(family="Wingdings", size=10, weight="bold"),fg="gray")
+    out.tooltip= Tooltip(out,"")
+    return out
+
+def _get_custom_entry(frame,text_variable,text_shown):
+    out = tk.Entry(frame, textvariable=text_variable, width=15, state=tk.DISABLED)
+    out.info_label = _get_info_label(frame)
+    out.info_label.pack(side=tk.LEFT)
+    tk.Label(frame, text=text_shown).pack(side=tk.LEFT)
+    out.pack(side=tk.LEFT)
+    return out
+
 class ImageProcessingGUI:
     def __init__(self, root):
         self.root = root
@@ -95,29 +106,12 @@ class ImageProcessingGUI:
 
         
         
-        
-        self.entry_center_x = tk.Entry(self.center_frame, textvariable=self.center_x_var, width=15, state=tk.DISABLED)
-        self.entry_center_x.info_label = _get_info_label(self.center_frame) 
-        self.entry_center_x.info_label.pack(side=tk.LEFT)
-        tk.Label(self.center_frame, text="Centro X:").pack(side=tk.LEFT, pady=5)
-        self.entry_center_x.pack(side=tk.LEFT, pady=5)
-        
-        
+        self.entry_center_x = _get_custom_entry(self.center_frame,self.center_x_var,"Centro X:")   
         self.all_entries.append(self.entry_center_x)
 
         tk.Label(self.center_frame).pack(side=tk.LEFT,padx=20)
 
-        
-        
-        
-        
-        
-        self.entry_center_y = tk.Entry(self.center_frame, textvariable=self.center_y_var, width=15, state=tk.DISABLED)
-        self.entry_center_y.info_label = _get_info_label(self.center_frame)
-        self.entry_center_y.info_label.pack(side=tk.LEFT)
-        #self.entry_center_y.info_label.config(text="")
-        tk.Label(self.center_frame, text="Centro Y:").pack(side=tk.LEFT)
-        self.entry_center_y.pack(side=tk.LEFT)
+        self.entry_center_y = _get_custom_entry(self.center_frame,self.center_y_var,"Centro Y:")
         self.all_entries.append(self.entry_center_y)
 
         # Frame per i Limiti (Int)
@@ -130,24 +124,12 @@ class ImageProcessingGUI:
 
              
         
-        
-        self.entry_xmin = tk.Entry(self.xminmax_frame, textvariable=self.xmin_var, width=15, state=tk.DISABLED)
-        self.entry_xmin.info_label = _get_info_label(self.xminmax_frame)
-        self.entry_xmin.info_label.pack(side=tk.LEFT)
-        #self.entry_xmin.info_label.config(text='')
-        tk.Label(self.xminmax_frame, text="X Min:").pack(side=tk.LEFT)
-        self.entry_xmin.pack(side=tk.LEFT)
+        self.entry_xmin = _get_custom_entry(self.xminmax_frame,self.xmin_var,"X Min:")
         self.all_entries.append(self.entry_xmin)
 
         tk.Label(self.xminmax_frame).pack(side=tk.LEFT,padx=30)
 
-        #self.entry_xmax_info_label.config(text='')
-        self.entry_xmax = tk.Entry(self.xminmax_frame, textvariable=self.xmax_var, width=15, state=tk.DISABLED)
-        self.entry_xmax.info_label = _get_info_label(self.xminmax_frame)
-        self.entry_xmax.info_label.pack(side=tk.LEFT)
-        tk.Label(self.xminmax_frame, text="X Max:").pack(side=tk.LEFT)
-
-        self.entry_xmax.pack(side=tk.LEFT)
+        self.entry_xmax = _get_custom_entry(self.xminmax_frame,self.xmax_var,"X Max:")
         self.all_entries.append(self.entry_xmax)
         
 
@@ -155,26 +137,12 @@ class ImageProcessingGUI:
         self.yminmax_frame = tk.Frame(self.limits_frame)
         self.yminmax_frame.pack(fill=tk.X, pady=2)
         
-        
-        self.entry_ymin = tk.Entry(self.yminmax_frame, textvariable=self.ymin_var, width=15, state=tk.DISABLED)
-        self.entry_ymin.info_label = _get_info_label(self.yminmax_frame)
-        self.entry_ymin.info_label.pack(side=tk.LEFT)
-        tk.Label(self.yminmax_frame, text="Y Min:").pack(side=tk.LEFT)
-        self.entry_ymin.pack(side=tk.LEFT)
+        self.entry_ymin = _get_custom_entry(self.yminmax_frame,self.ymin_var,"Y Min:")
         self.all_entries.append(self.entry_ymin)
 
         tk.Label(self.yminmax_frame).pack(side=tk.LEFT,padx=30)
 
-        #self.entry_xmax_info_label.config(text='')
-        
-        
-        self.entry_ymax = tk.Entry(self.yminmax_frame, textvariable=self.ymax_var, width=15, state=tk.DISABLED)
-        self.entry_ymax.info_label = _get_info_label(self.yminmax_frame)
-        self.entry_ymax.info_label.pack(side=tk.LEFT)
-        self.entry_ymax.info_tooltip = Tooltip(self.entry_ymax.info_label,"WAA")
-        #TODO : trovare un modo per disattivare il tooltip
-        tk.Label(self.yminmax_frame, text="Y Max:").pack(side=tk.LEFT)
-        self.entry_ymax.pack(side=tk.LEFT)
+        self.entry_ymax = _get_custom_entry(self.yminmax_frame,self.ymax_var,"Y Max:")  
         self.all_entries.append(self.entry_ymax)
 
         # Combobox
@@ -521,7 +489,7 @@ class ImageProcessingGUI:
         
 
         for i, entry_widget in enumerate(self.all_entries):
-            conditional_config(entry_widget,all_ok[i])
+            conditional_config(entry_widget.info_label,all_ok[i])
 
 
         min_max_ok = False
@@ -529,12 +497,12 @@ class ImageProcessingGUI:
         if all_limits_ok:
             x_min_max_ok = (int(self.xmin_var.get()) < int(self.xmax_var.get()))
             if not x_min_max_ok:
-                conditional_config(self.entry_xmax,False)
-                conditional_config(self.entry_xmin,False)
+                conditional_config(self.entry_xmax.info_label,False)
+                conditional_config(self.entry_xmin.info_label,False)
             y_min_max_ok=(int(self.ymin_var.get()) < int(self.ymax_var.get()))
             if not y_min_max_ok:
-                conditional_config(self.entry_ymax,False)
-                conditional_config(self.entry_ymin,False)
+                conditional_config(self.entry_ymax.info_label,False)
+                conditional_config(self.entry_ymin.info_label,False)
             min_max_ok = x_min_max_ok and y_min_max_ok
             self.validations.min_max_ok = min_max_ok
 
@@ -569,12 +537,12 @@ class ImageProcessingGUI:
         # Validazione dei campi condizionali attualmente visibili
         if selected_option == self.options[0]: # Division by Azimuthal Average
             rho_pixels_ok = self._validate_int_input_and_approximate(self.rho_pixels_var, min_val=1,max_val=self.rho_max)
-            conditional_config(self.conditional_widgets_map["rho_pixels"]["widget"],rho_pixels_ok)
+            conditional_config(self.conditional_widgets_map["rho_pixels"]["info_label"],rho_pixels_ok)
             theta_pixels_ok = self._validate_int_input_and_approximate(self.theta_pixels_var, min_val=1)
-            conditional_config(self.conditional_widgets_map["theta_pixels"]["widget"],theta_pixels_ok)
+            conditional_config(self.conditional_widgets_map["theta_pixels"]["info_label"],theta_pixels_ok)
              
             std_dev_theta_ok= self._validate_double_input(self.std_dev_theta_var.get(),min_val=0)
-            conditional_config(self.conditional_widgets_map["std_dev_theta"]["widget"],std_dev_theta_ok)            
+            conditional_config(self.conditional_widgets_map["std_dev_theta"]["info_label"],std_dev_theta_ok)            
             all_conditional_ok = rho_pixels_ok and theta_pixels_ok and std_dev_theta_ok
             self.validations.option = 0
             self.validations.all_conditional_ok = all_conditional_ok
@@ -585,9 +553,9 @@ class ImageProcessingGUI:
 
         elif selected_option == self.options[1] or selected_option == self.options[3]: # Azimuthal Median / Division by 1/rho profile
             rho_pixels_ok = self._validate_int_input_and_approximate(self.rho_pixels_var, min_val=1,max_val=self.rho_max)
-            conditional_config(self.conditional_widgets_map["rho_pixels"]["widget"],rho_pixels_ok)
+            conditional_config(self.conditional_widgets_map["rho_pixels"]["info_label"],rho_pixels_ok)
             theta_pixels_ok = self._validate_int_input_and_approximate(self.theta_pixels_var, min_val=1)
-            conditional_config(self.conditional_widgets_map["theta_pixels"]["widget"],theta_pixels_ok)
+            conditional_config(self.conditional_widgets_map["theta_pixels"]["info_label"],theta_pixels_ok)
             all_conditional_ok = rho_pixels_ok and theta_pixels_ok
             self.validations.option = 1
             self.validations.all_conditional_ok = all_conditional_ok
@@ -598,13 +566,13 @@ class ImageProcessingGUI:
             
         elif selected_option == self.options[2]: # Azimuthal Renormalization
             rho_pixels_ok = self._validate_int_input_and_approximate(self.rho_pixels_var, min_val=1,max_val=self.rho_max)
-            conditional_config(self.conditional_widgets_map["rho_pixels"]["widget"],rho_pixels_ok)
+            conditional_config(self.conditional_widgets_map["rho_pixels"]["info_label"],rho_pixels_ok)
             theta_pixels_ok = self._validate_int_input_and_approximate(self.theta_pixels_var, min_val=1)
-            conditional_config(self.conditional_widgets_map["theta_pixels"]["widget"],theta_pixels_ok)
+            conditional_config(self.conditional_widgets_map["theta_pixels"]["info_label"],theta_pixels_ok)
             std_dev_theta_ok = self._validate_double_input(self.std_dev_theta_var.get(), min_val=-1e-15, allow_zero=True)
-            conditional_config(self.conditional_widgets_map["std_dev_theta"]["widget"],std_dev_theta_ok)
+            conditional_config(self.conditional_widgets_map["std_dev_theta"]["info_label"],std_dev_theta_ok)
             min_max_std_dev_ok = self._validate_double_input(self.min_max_std_dev_var.get(), min_val=-1e-15, allow_zero=True)
-            conditional_config(self.conditional_widgets_map["min_max_std_dev"]["widget"],min_max_std_dev_ok)
+            conditional_config(self.conditional_widgets_map["min_max_std_dev"]["info_label"],min_max_std_dev_ok)
             all_conditional_ok = rho_pixels_ok and theta_pixels_ok and std_dev_theta_ok and min_max_std_dev_ok
 
             self.validations.option = 2
@@ -618,13 +586,13 @@ class ImageProcessingGUI:
 
         elif selected_option == self.options[4]: # Radially Variable Spatial Filtering
             kernel_a_ok = self._validate_double_input(self.kernel_a_term_var.get(),min_val=0, allow_zero=False)
-            conditional_config(self.conditional_widgets_map["kernel_a_term"]["widget"],kernel_a_ok)
+            conditional_config(self.conditional_widgets_map["kernel_a_term"]["info_label"],kernel_a_ok)
 
             kernel_b_ok = self._validate_double_input(self.kernel_b_term_var.get(),min_val=0, allow_zero=False)
-            conditional_config(self.conditional_widgets_map["kernel_b_term"]["widget"],kernel_b_ok)
+            conditional_config(self.conditional_widgets_map["kernel_b_term"]["info_label"],kernel_b_ok)
 
             kernel_n_ok = self._validate_double_input(self.kernel_n_term_var.get(),min_val=0, allow_zero=False)
-            conditional_config(self.conditional_widgets_map["kernel_n_term"]["widget"],kernel_n_ok)
+            conditional_config(self.conditional_widgets_map["kernel_n_term"]["info_label"],kernel_n_ok)
 
             all_conditional_ok = kernel_a_ok and kernel_b_ok and kernel_n_ok
 
