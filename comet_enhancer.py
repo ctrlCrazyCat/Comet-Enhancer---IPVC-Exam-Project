@@ -60,6 +60,7 @@ class ImageProcessingGUI:
         # --- Variabili per TUTTI i campi condizionali ---
         self.rho_pixels_var = tk.StringVar()
         self.rho_max = 0
+        self.rho_default = 0
         self.theta_pixels_var = tk.StringVar()
         self.std_dev_theta_var = tk.StringVar()
         self.min_max_std_dev_var = tk.StringVar()
@@ -509,11 +510,7 @@ class ImageProcessingGUI:
             ymax =max((self.image_height-ynuc),ynuc)
             xmin= min((self.image_width-xnuc),xnuc)
             ymin = min((self.image_height-ynuc),ynuc)
-            rho_default= int(min(xmin,ymin))
-            #if not self.rho_pixels_var.get(): 
-            # #TODO: Gestire questa cosa quando si preme il tasto SUBMIT => se assente allora scrivere "assente, il valore di default è..."
-
-            #self.rho_pixels_var.set(str(rho_default))
+            self.rho_default= max(int(min(xmin,ymin)),1)
             self.rho_max=int(np.floor((xmax**2+ymax**2)**0.5))
 
 
@@ -708,7 +705,8 @@ class ImageProcessingGUI:
                         if not self.validations.all_center_ok:
                             detail_string=detail_string + "-Limiti per numero di pixel asse ρ (rho) non calcolabili\n"
                         else:
-                            detail_string = detail_string + "-Numero di pixel asse ρ (rho) "+self.validations.rho_pixels_ok[1]+"\n"
+                            detail_string = detail_string + "-Numero di pixel asse ρ (rho) "+self.validations.rho_pixels_ok[1]+", sarà impostato "+str(self.rho_default)+" che corrisponde alla più grande circonfernza contenuta nell'immagine a partire dal nucelo\n"
+                            self.rho_pixels_var.set(str(self.rho_default))
                     if not self.validations.theta_pixels_ok[0]:
                         detail_string = detail_string + "-Numero di pixel asse θ "+self.validations.theta_pixels_ok[1]+"\n"
                     if not self.validations.std_dev_theta_ok[0]:
