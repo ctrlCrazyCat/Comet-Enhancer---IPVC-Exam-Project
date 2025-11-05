@@ -221,7 +221,7 @@ class ImageProcessingGUI:
             self.options[2]: [ # Azimuthal Renormalization
                 ("rho_pixels", 0), ("theta_pixels", 1), ("std_dev_theta", 2), ("min_max_std_dev", 3)
             ],
-            self.options[3]: [ # Division by 1/rho profile
+            self.options[3]: [ # Division by 1/rho profile #TODO: Modificare questa cosa 
                 ("rho_pixels", 0), ("theta_pixels", 1)
             ],
             self.options[4]: [ # Radially Variable Spatial Filtering
@@ -544,6 +544,8 @@ class ImageProcessingGUI:
         selected_option = self.combobox_choice.get()
         #TODO: VEDERE SE SI PUO OTTIMIZZARE QUI IL CODICE
         # Validazione dei campi condizionali attualmente visibili
+        #TODO: modificare condizione di rho in modo che veda anche i paramtri del centro 
+        #TODO: modificare il termine centro con "coordinate nucleo" oppure "ortocentro", qualcosa di più scientifico
         if selected_option == self.options[0]: # Division by Azimuthal Average
             rho_pixels_ok = self._validate_int_input_and_approximate(self.rho_pixels_var, min_val=1,max_val=self.rho_max)
             conditional_config(self.conditional_widgets_map["rho_pixels"]["info_label"],rho_pixels_ok)
@@ -560,7 +562,7 @@ class ImageProcessingGUI:
                 self.validations.theta_pixels_ok = theta_pixels_ok
                 self.validations.std_dev_theta_ok = std_dev_theta_ok
 
-        elif selected_option == self.options[1] or selected_option == self.options[3]: # Azimuthal Median / Division by 1/rho profile
+        elif selected_option == self.options[1]: # Azimuthal Median / Division by 1/rho profile
             rho_pixels_ok = self._validate_int_input_and_approximate(self.rho_pixels_var, min_val=1,max_val=self.rho_max)
             conditional_config(self.conditional_widgets_map["rho_pixels"]["info_label"],rho_pixels_ok)
             theta_pixels_ok = self._validate_int_input_and_approximate(self.theta_pixels_var, min_val=1)
@@ -571,6 +573,9 @@ class ImageProcessingGUI:
             if not all_conditional_ok:
                 self.validations.rho_pixels_ok = rho_pixels_ok
                 self.validations.theta_pixels_ok = theta_pixels_ok
+        elif selected_option==self.options[3]:
+            self.validations.option = 3
+            all_conditional_ok = True
                 
             
         elif selected_option == self.options[2]: # Azimuthal Renormalization
