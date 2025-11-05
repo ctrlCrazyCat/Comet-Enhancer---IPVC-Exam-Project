@@ -100,7 +100,7 @@ class ImageProcessingGUI:
         self.image_info_label.pack(pady=5)
 
         # Frame per i valori del Centro (Double)
-        self.center_frame = ttk.LabelFrame(root, text="Centro Immagine (X, Y - double)")
+        self.center_frame = ttk.LabelFrame(root, text="Centro Nucleo Cometa (X, Y - double)")
         self.center_frame.pack(pady=10, padx=10, fill=tk.X)
 
         self.all_entries=[]
@@ -346,10 +346,19 @@ class ImageProcessingGUI:
                 widget.config(state=tk.DISABLED)
                 variable.set(False) # Resetta BooleanVar
 
-        # 2. Mostra e abilita solo i widget richiesti dall'opzione corrente
+        # 2. Mostra/Nasconde il FRAME e popola i widget in base alla selezione
         selected_option = self.combobox_choice.get()
         print(selected_option,"AAA")
-        if selected_option in self.option_to_widgets_config and selected_option != self.options[3]:
+
+        if selected_option == self.options[3]:
+            # Opzione [3]: Nascondi il frame
+            self.conditional_params_frame.pack_forget()
+        
+        elif selected_option in self.option_to_widgets_config:
+            # Altre opzioni valide: Mostra frame e popola
+            self.conditional_params_frame.pack(pady=10, padx=10, fill=tk.X) # MOSTRA
+            self.conditional_params_frame.config(text=f"Parametri per '{selected_option}'")
+            
             for widget_key, row_num in self.option_to_widgets_config[selected_option]:
                 components = self.conditional_widgets_map[widget_key]
                 label = components["label"]
@@ -360,9 +369,12 @@ class ImageProcessingGUI:
                 label.grid(row=row_num, column=1, padx=5, pady=5, sticky="w")
                 widget.grid(row=row_num, column=2, padx=5, pady=5, sticky="ew")
                 widget.config(state=tk.NORMAL)
-            self.conditional_params_frame.config(text=f"Parametri per '{selected_option}'")
         else:
+            # Caso fallback (es. opzione non in config, ma non è op[3])
+            # o se l'opzione [3] non fosse gestita esplicitamente sopra
+            self.conditional_params_frame.pack(pady=10, padx=10, fill=tk.X) # MOSTRA
             self.conditional_params_frame.config(text="Nessun parametro specifico per questa opzione.")
+
 
         # Nasconde il pulsante Submit (lo stato sarà gestito da _validate_all_inputs)
         self.submit_button.pack_forget()
@@ -536,7 +548,7 @@ class ImageProcessingGUI:
 
 
         # Mostra sempre il frame contenitore dei parametri condizionali se un'immagine è caricata
-        self.conditional_params_frame.pack(pady=10, padx=10, fill=tk.X)
+        #self.conditional_params_frame.pack(pady=10, padx=10, fill=tk.X)
         
         
         selected_option = self.combobox_choice.get()
