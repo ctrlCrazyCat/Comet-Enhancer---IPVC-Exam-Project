@@ -434,6 +434,11 @@ class ImageProcessingGUI:
             return (True,"correttamente inserito")
         except ValueError:
             return (False,"non rappresenta un numero a virgola mobile")
+    def _validate_rho_input_and_approximate(self,all_center_ok:bool):
+        if not all_center_ok:
+            return (False,"dati sul Centro Nucleo Cometa non correttamente inseriti o assenti")
+        return self._validate_int_input_and_approximate(self.rho_pixels_var,1,self.rho_max)
+    
 
     def _validate_int_input_and_approximate(self, value_var, min_val=1, max_val=None):
         """
@@ -555,9 +560,9 @@ class ImageProcessingGUI:
         #TODO: VEDERE SE SI PUO OTTIMIZZARE QUI IL CODICE
         # Validazione dei campi condizionali attualmente visibili
         #TODO: modificare condizione di rho in modo che veda anche i paramtri del centro 
-        #TODO: modificare il termine centro con "coordinate nucleo" oppure "ortocentro", qualcosa di più scientifico
+        
         if selected_option == self.options[0]: # Division by Azimuthal Average
-            rho_pixels_ok = self._validate_int_input_and_approximate(self.rho_pixels_var, min_val=1,max_val=self.rho_max)
+            rho_pixels_ok = self._validate_rho_input_and_approximate(all_center_ok)
             conditional_config(self.conditional_widgets_map["rho_pixels"]["info_label"],rho_pixels_ok)
             theta_pixels_ok = self._validate_int_input_and_approximate(self.theta_pixels_var, min_val=1)
             conditional_config(self.conditional_widgets_map["theta_pixels"]["info_label"],theta_pixels_ok)
@@ -573,7 +578,7 @@ class ImageProcessingGUI:
                 self.validations.std_dev_theta_ok = std_dev_theta_ok
 
         elif selected_option == self.options[1]: # Azimuthal Median / Division by 1/rho profile
-            rho_pixels_ok = self._validate_int_input_and_approximate(self.rho_pixels_var, min_val=1,max_val=self.rho_max)
+            rho_pixels_ok = self._validate_rho_input_and_approximate(all_center_ok)
             conditional_config(self.conditional_widgets_map["rho_pixels"]["info_label"],rho_pixels_ok)
             theta_pixels_ok = self._validate_int_input_and_approximate(self.theta_pixels_var, min_val=1)
             conditional_config(self.conditional_widgets_map["theta_pixels"]["info_label"],theta_pixels_ok)
@@ -589,7 +594,7 @@ class ImageProcessingGUI:
                 
             
         elif selected_option == self.options[2]: # Azimuthal Renormalization
-            rho_pixels_ok = self._validate_int_input_and_approximate(self.rho_pixels_var, min_val=1,max_val=self.rho_max)
+            rho_pixels_ok = self._validate_rho_input_and_approximate(all_center_ok)
             conditional_config(self.conditional_widgets_map["rho_pixels"]["info_label"],rho_pixels_ok)
             theta_pixels_ok = self._validate_int_input_and_approximate(self.theta_pixels_var, min_val=1)
             conditional_config(self.conditional_widgets_map["theta_pixels"]["info_label"],theta_pixels_ok)
