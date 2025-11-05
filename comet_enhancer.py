@@ -222,7 +222,7 @@ class ImageProcessingGUI:
                 ("rho_pixels", 0), ("theta_pixels", 1), ("std_dev_theta", 2), ("min_max_std_dev", 3)
             ],
             self.options[3]: [ # Division by 1/rho profile #TODO: Modificare questa cosa 
-                ("rho_pixels", 0), ("theta_pixels", 1)
+                #("rho_pixels", 0), ("theta_pixels", 1)
             ],
             self.options[4]: [ # Radially Variable Spatial Filtering
                 ("kernel_a_term", 0), ("kernel_b_term", 1), ("kernel_n_term", 2), ("transform_log", 3)
@@ -262,10 +262,7 @@ class ImageProcessingGUI:
             except ZeroDivisionError as e:
                 o.rejsig = float('inf')
 
-
-            
-
-        if selected_option == app.options[1] or selected_option == app.options[3]:
+        if selected_option == app.options[1]:
             o.nrad=int(self.rho_pixels_var.get())
             o.ntheta=int(self.theta_pixels_var.get()) 
 
@@ -351,7 +348,8 @@ class ImageProcessingGUI:
 
         # 2. Mostra e abilita solo i widget richiesti dall'opzione corrente
         selected_option = self.combobox_choice.get()
-        if selected_option in self.option_to_widgets_config:
+        print(selected_option,"AAA")
+        if selected_option in self.option_to_widgets_config and selected_option != self.options[3]:
             for widget_key, row_num in self.option_to_widgets_config[selected_option]:
                 components = self.conditional_widgets_map[widget_key]
                 label = components["label"]
@@ -753,16 +751,15 @@ if __name__ == "__main__":
                 o.imn=comet_pack.reconstruct_from_polar(imien,o.NCOL,o.NROW,o.xnuc,o.ynuc,o.x_lower_lim,o.x_upper_lim,o.y_lower_lim,o.y_upper_lim)
                 print("SIZE",o.imn.shape)
 
-            elif selected_option == app.options[1] or selected_option == app.options[3]:
+            elif selected_option == app.options[1]:
                 print(f"  Rho Pixels: {int(app.rho_pixels_var.get())}")
-                print(f"  Theta Pixels: {int(app.theta_pixels_var.get())}")
-                if selected_option == app.options[1]:#DIV AZIMUTHAL MEDIAN
-                    imiun = comet_pack.polarize(o.imold,o.nrad,o.ntheta,o.xnuc,o.ynuc)     
-                    imien = comet_pack.azimuthal_median_division(imiun)
-                    o.imn=comet_pack.reconstruct_from_polar(imien,o.NCOL,o.NROW,o.xnuc,o.ynuc,o.x_lower_lim,o.x_upper_lim,o.y_lower_lim,o.y_upper_lim)
-                else: #3 DIV RHO
-                    o.imn=comet_pack.enhance_inverserho_vectorized(o.imold,o.xnuc,o.ynuc,o.x_lower_lim,o.x_upper_lim,o.y_lower_lim,o.y_upper_lim)
+                print(f"  Theta Pixels: {int(app.theta_pixels_var.get())}") 
+                imiun = comet_pack.polarize(o.imold,o.nrad,o.ntheta,o.xnuc,o.ynuc)     
+                imien = comet_pack.azimuthal_median_division(imiun)
+                o.imn=comet_pack.reconstruct_from_polar(imien,o.NCOL,o.NROW,o.xnuc,o.ynuc,o.x_lower_lim,o.x_upper_lim,o.y_lower_lim,o.y_upper_lim)
+
                     
+            
             elif selected_option == app.options[2]:#RENORMALIZATION
                 print(f"  Rho Pixels: {int(app.rho_pixels_var.get())}")
                 print(f"  Theta Pixels: {int(app.theta_pixels_var.get())}")
@@ -772,7 +769,9 @@ if __name__ == "__main__":
                 imiun = comet_pack.polarize(o.imold,o.nrad,o.ntheta,o.xnuc,o.ynuc)            
                 imien=comet_pack.azimuthal_renormalization(imiun,o.rejsig,o.nsig)
                 o.imn=comet_pack.reconstruct_from_polar(imien,o.NCOL,o.NROW,o.xnuc,o.ynuc,o.x_lower_lim,o.x_upper_lim,o.y_lower_lim,o.y_upper_lim)
-                
+
+            elif selected_option == app.options[3]:
+                o.imn=comet_pack.enhance_inverserho_vectorized(o.imold,o.xnuc,o.ynuc,o.x_lower_lim,o.x_upper_lim,o.y_lower_lim,o.y_upper_lim)    
 
             elif selected_option == app.options[4]:
                 print(f"  Kernel A Term: {float(app.kernel_a_term_var.get())}")
