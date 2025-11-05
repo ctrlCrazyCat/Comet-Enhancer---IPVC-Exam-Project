@@ -208,7 +208,7 @@ class ImageProcessingGUI:
                 "variable": self.transform_log_var
             }
         }
-        #TODO: CREARE UN CONDITIONAL CONFIG SOLO PER RHO PIXEL
+        
 
         # Mappa le opzioni ai widget necessari e alla loro riga di griglia
         self.option_to_widgets_config = {
@@ -221,7 +221,7 @@ class ImageProcessingGUI:
             self.options[2]: [ # Azimuthal Renormalization
                 ("rho_pixels", 0), ("theta_pixels", 1), ("std_dev_theta", 2), ("min_max_std_dev", 3)
             ],
-            self.options[3]: [ # Division by 1/rho profile #TODO: Modificare questa cosa 
+            self.options[3]: [ # Division by 1/rho profile  
                 #("rho_pixels", 0), ("theta_pixels", 1)
             ],
             self.options[4]: [ # Radially Variable Spatial Filtering
@@ -420,7 +420,13 @@ class ImageProcessingGUI:
         Se allow_zero è False, il valore deve essere > 0.
         """
         value_str = value_var.get()
-        if not value_str: return (False,"è assente")
+        if not value_str: 
+            stringa = "è assente, deve essere maggiore o uguale a "+str(min_val)
+            if max_val is not None:
+                stringa = stringa + " , minore o uguale a "+str(max_val)
+            if not allow_zero:
+                stringa = stringa +" e diverso da 0"
+            return (False,stringa)
         try:
             val = float(value_str)
             if not allow_zero and val <= 0:
@@ -447,7 +453,11 @@ class ImageProcessingGUI:
         Aggiorna la StringVar con l'intero approssimato.
         """
         value_str = value_var.get()
-        if not value_str: return (False,"è assente")
+        if not value_str: 
+            stringa = "è assente, deve essere maggiore o uguale a "+str(min_val)
+            if max_val is not None:
+                stringa = stringa + " e minore o uguale a "+str(max_val)
+            return (False,stringa)
 
         try:
             temp_val = float(value_str)
@@ -559,7 +569,7 @@ class ImageProcessingGUI:
         selected_option = self.combobox_choice.get()
         #TODO: VEDERE SE SI PUO OTTIMIZZARE QUI IL CODICE
         # Validazione dei campi condizionali attualmente visibili
-        #TODO: modificare condizione di rho in modo che veda anche i paramtri del centro 
+        
         
         if selected_option == self.options[0]: # Division by Azimuthal Average
             rho_pixels_ok = self._validate_rho_input_and_approximate(all_center_ok)
