@@ -17,13 +17,19 @@ from tooltip import Tooltip
 
 def conditional_config(entry_widget_info,configuration):
         (condition,text) = configuration
-        entry_widget_info.config(fg='green')
+        entry_widget_info.config(fg='green',cursor="question_arrow")
         if not condition:
-            entry_widget_info.config(fg='red')
+            entry_widget_info.config(fg='red',cursor="question_arrow")
         entry_widget_info.tooltip.text = text
+
 def _get_info_label(frame,tooltip_enabled = False):
     out = tk.Label(frame, text="l",font=tkFont.Font(family="Wingdings", size=12, weight="bold"),fg="gray")
     out.tooltip= Tooltip(out,"",tooltip_enabled)
+    
+    return out
+def _get_guide_label(frame,text):
+    out=tk.Label(frame,text=" ?  ",font=tkFont.Font(size=14,weight="bold"),fg="blue", cursor="question_arrow")
+    out.tooltip = Tooltip(out,text,tooltip_enabled=True)
     return out
 
 def _get_custom_entry(frame,text_variable,text_shown,tooltip_enabled = False):
@@ -92,9 +98,10 @@ class ImageProcessingGUI:
         self.transform_log_var.trace("w", self._validate_all_inputs)
         
         # --- Creazione dei Widget ---
-
+#TODO:FARE IN MODO CHE IL TOOLTIP COMPARE ANCHE SE CLICCO
+#MAGARI RICHIAMANDO UNA FUNZIONE DEL TOOLTIP CHE GIA' ESISTE (SHOW)
         # Pulsante per scegliere l'immagine
-        self.select_image_button = tk.Button(root, text="Scegli Immagine FIT/FITS", command=self._select_image) # Modificato il testo
+        self.select_image_button = tk.Button(root, text="Scegli Immagine FIT/FITS", command=self._select_image,cursor="hand2") # Modificato il testo
         self.select_image_button.pack(pady=10)
 
         self.image_info_label = tk.Label(root, text="Nessuna immagine selezionata.")
@@ -116,6 +123,8 @@ class ImageProcessingGUI:
         self.entry_center_y = _get_custom_entry(self.center_frame,self.center_y_var,"Centro Y:")
         self.all_entries.append(self.entry_center_y)
 
+        _get_guide_label(self.center_frame,"Coordinate (x,y) dell'optocentro - indicano dove centrare il miglioramento.\nTipicamente la parte più luminosa dell'immagine.\nNota bene che il pixel all'origine è (1,1) e non (0,0).").pack(side=tk.LEFT)
+
         # Frame per i Limiti (Int)
         self.limits_frame = ttk.LabelFrame(root, text="Limiti di Elaborazione (X Min/Max, Y Min/Max - int)")
         self.limits_frame.pack(pady=10, padx=10, fill=tk.X)
@@ -126,31 +135,33 @@ class ImageProcessingGUI:
 
              
         
-        self.entry_xmin = _get_custom_entry(self.xminmax_frame,self.xmin_var,"X Min:")
+        self.entry_xmin = _get_custom_entry(self.xminmax_frame,self.xmin_var,"    X Min:")
         self.all_entries.append(self.entry_xmin)
 
-        tk.Label(self.xminmax_frame).pack(side=tk.LEFT,padx=30)
+        tk.Label(self.xminmax_frame).pack(side=tk.LEFT,padx=20)
 
-        self.entry_xmax = _get_custom_entry(self.xminmax_frame,self.xmax_var,"X Max:")
+        self.entry_xmax = _get_custom_entry(self.xminmax_frame,self.xmax_var,"    X Max:")
+
         self.all_entries.append(self.entry_xmax)
         
+        _get_guide_label(self.xminmax_frame,"Modificare questi parametri se si desidera elaborare solo una sezione dell'immagine").pack(side=tk.LEFT)
 
         # Riga Y Min/Max
         self.yminmax_frame = tk.Frame(self.limits_frame)
         self.yminmax_frame.pack(fill=tk.X, pady=2)
         
-        self.entry_ymin = _get_custom_entry(self.yminmax_frame,self.ymin_var,"Y Min:")
+        self.entry_ymin = _get_custom_entry(self.yminmax_frame,self.ymin_var,"    Y Min:")
         self.all_entries.append(self.entry_ymin)
 
-        tk.Label(self.yminmax_frame).pack(side=tk.LEFT,padx=30)
+        tk.Label(self.yminmax_frame).pack(side=tk.LEFT,padx=20)
 
-        self.entry_ymax = _get_custom_entry(self.yminmax_frame,self.ymax_var,"Y Max:")  
+        self.entry_ymax = _get_custom_entry(self.yminmax_frame,self.ymax_var,"    Y Max:")  
         self.all_entries.append(self.entry_ymax)
 
         # Combobox
         self.style = ttk.Style()
         self.style.configure('TCombobox', fieldbackground='white', background='lightgrey')
-        self.combobox = ttk.Combobox(root, textvariable=self.combobox_choice, values=self.options, state='readonly', width=40)
+        self.combobox = ttk.Combobox(root, textvariable=self.combobox_choice, values=self.options, state='readonly', width=40,cursor="hand2")
         self.combobox.bind("<<ComboboxSelected>>", self._on_combobox_selected_event_for_bind)
         self.combobox.pack(pady=10)
 
@@ -164,49 +175,57 @@ class ImageProcessingGUI:
                 "label": tk.Label(self.conditional_params_frame, text="Numero di pixel asse ρ (rho):"), 
                 "info_label":_get_info_label(self.conditional_params_frame,tooltip_enabled=True),
                 "widget": tk.Entry(self.conditional_params_frame, textvariable=self.rho_pixels_var, width=20),
-                "variable": self.rho_pixels_var
+                "variable": self.rho_pixels_var,
+                "guide":_get_guide_label(self.conditional_params_frame,"Questa routine converte l'immagine di ingresso in coordinate polari (ρ, θ).\nQuesto parametro permette di scegliere la quantità di pixel da impostare sull'asse ρ.")
             },
             "theta_pixels": {
                 "label": tk.Label(self.conditional_params_frame, text="Numero di pixel asse θ:"), 
                 "info_label":_get_info_label(self.conditional_params_frame,tooltip_enabled=True),
                 "widget": tk.Entry(self.conditional_params_frame, textvariable=self.theta_pixels_var, width=20),
-                "variable": self.theta_pixels_var
+                "variable": self.theta_pixels_var,
+                "guide":_get_guide_label(self.conditional_params_frame,"Questa routine converte l'immagine di ingresso in coordinate polari (ρ, θ).\nQuesto parametro permette di scegliere la quantità di pixel da impostare sull'asse θ.")
             },
             "std_dev_theta": {
                 "label": tk.Label(self.conditional_params_frame, text="Quante deviazioni standard dovrebbero essere accettate per i pixel asse θ?"), 
                 "info_label":_get_info_label(self.conditional_params_frame,tooltip_enabled=True),
                 "widget": tk.Entry(self.conditional_params_frame, textvariable=self.std_dev_theta_var, width=20),
-                "variable": self.std_dev_theta_var
+                "variable": self.std_dev_theta_var,
+                "guide":_get_guide_label(self.conditional_params_frame,'Gli algoritmi che migliorano le immagini possono essere molto sensibi ai pixel "morti", corpi luminosi e altre anomalie.\nPer mitigare questo problema si ignorano i pixel anomali rispetto a quelli vicini ad essi.\nQuesto parametro permette di impostare quante deviazioni standard dal pixel medio sono accettabili. Una scelta comune è 3.')
             },
             "min_max_std_dev": {
                 "label": tk.Label(self.conditional_params_frame, text="How many standard deviations from the mean should\nthe minimum and maximum pixel values be?"), 
                 "info_label":_get_info_label(self.conditional_params_frame,tooltip_enabled=True),
                 "widget": tk.Entry(self.conditional_params_frame, textvariable=self.min_max_std_dev_var, width=20),
-                "variable": self.min_max_std_dev_var
+                "variable": self.min_max_std_dev_var,
+                "guide":_get_guide_label(self.conditional_params_frame,"Nella rinormalizzazione azimutale i valori dei pixel sono scalati ad un nuovo range determinato dagli altri pixel nell'azimut.\nQuesto parametro permette di impostare quante deviazioni standard dal pixel medio i valore dovrebbero essere all'interno dell'immagine migliorata.\nUna scelta comune è 3.")
             },
             "kernel_a_term": {
                 "label": tk.Label(self.conditional_params_frame, text="valore Kernel A (double):"), 
                 "info_label":_get_info_label(self.conditional_params_frame,tooltip_enabled=True),
                 "widget": tk.Entry(self.conditional_params_frame, textvariable=self.kernel_a_term_var, width=20),
-                "variable": self.kernel_a_term_var
+                "variable": self.kernel_a_term_var,
+                "guide":_get_guide_label(self.conditional_params_frame,"Il valore kernel A è la distanza di base tra il pixel che deve essere migliorato e il lato del kernel.\nAumentare questo valore fa incrementare la grandezza del kernel vicino al nucleo, senza un impatto significativo sulla grandezza del kernel lontano dal nucleo\nVisita la guida completa per una spiegazione più dettagliata sul kernel.\nQuesto valore è di solito nell'ordine di 1")
             },
             "kernel_b_term": {
                 "label": tk.Label(self.conditional_params_frame, text="valore Kernel B (double):"), 
                 "info_label":_get_info_label(self.conditional_params_frame,tooltip_enabled=True),
                 "widget": tk.Entry(self.conditional_params_frame, textvariable=self.kernel_b_term_var, width=20),
-                "variable": self.kernel_b_term_var
+                "variable": self.kernel_b_term_var,
+                "guide":_get_guide_label(self.conditional_params_frame,"Il valore kernel B scala linearmente la grandezza del kernel in base alla distanza dal nucleo.\nAumentare questo valore fa incrementare la grandezza del kernel lungo tutte le distanze dal nucleo.\nVisita la guida completa per una spiegazione più dettagliata sul kernel.\nQuesto valore è di solito nell'ordine di 1")
             },
             "kernel_n_term": {
                 "label": tk.Label(self.conditional_params_frame, text="valore Kernel N (double):"), 
                 "info_label":_get_info_label(self.conditional_params_frame,tooltip_enabled=True),
                 "widget": tk.Entry(self.conditional_params_frame, textvariable=self.kernel_n_term_var, width=20),
-                "variable": self.kernel_n_term_var
+                "variable": self.kernel_n_term_var,
+                "guide":_get_guide_label(self.conditional_params_frame,"Il valore N del kernel scala esponenzialmente la grandezza del kernel in base alla distanza dal nucleo.\nAumentare questo valore fa aumentare la grandezza del kernel quando lontano dal nucleo, senza avere un impatto significativo sulla grandezza del kernel vicino al nucleo.\nVisita la guida completa per una spiegazione più dettagliata sul kernel.\nQuesto valore è di solito nell'ordine di 0.1")
             },
             "transform_log": {
                 "label": tk.Label(self.conditional_params_frame, text="Trasformare l'immagine input in scala log-10 prima di migliorarla?"), 
                 "info_label":_get_info_label(self.conditional_params_frame),
                 "widget": tk.Checkbutton(self.conditional_params_frame, variable=self.transform_log_var, text="Sì"),
-                "variable": self.transform_log_var
+                "variable": self.transform_log_var,
+                "guide":_get_guide_label(self.conditional_params_frame,"Questa opzione permette di riscalare l'immagine nello spazio log-10 prima che la procedura di miglioramento venga avviata.\nLa presenza di pixel negativi non permetterà la trasformazione logaritmica.\nPuoi controllare il valore 'logarithmic image' nell'header dell'immagine migliorata per avere la certezza che la trasformazione sia stata applicata.")#TODO:HEADER PER QUESTA COSA
             }
         }
         
@@ -232,7 +251,7 @@ class ImageProcessingGUI:
         
         # Pulsante Submit (inizialmente nascosto e disabilitato)
         grande_font = tkFont.Font(family="Arial", size=20, weight="bold")
-        self.submit_button = tk.Button(root, text="Submit",font=grande_font, command=self._on_submit_button_click) # Modificato il command
+        self.submit_button = tk.Button(root, text="Submit",font=grande_font, command=self._on_submit_button_click,cursor="hand2") # Modificato il command
 
         # Inizializzazione degli stati
         self._validate_all_inputs()
@@ -335,10 +354,12 @@ class ImageProcessingGUI:
             info_label = components["info_label"]
             widget = components["widget"]
             variable = components["variable"] 
+            guide = components["guide"]
             
             info_label.grid_remove()
             label.grid_remove() 
             widget.grid_remove()
+            guide.grid_remove()
             
             if isinstance(widget, tk.Entry):
                 widget.config(state=tk.DISABLED)
@@ -364,12 +385,14 @@ class ImageProcessingGUI:
                 components = self.conditional_widgets_map[widget_key]
                 label = components["label"]
                 info_label=components["info_label"]
-                widget = components["widget"]
+                widget = components["widget"]  
+                guide = components["guide"]
                 
                 info_label.grid(row=row_num,column=0,padx=0,pady=0,sticky="w")
                 label.grid(row=row_num, column=1, padx=5, pady=5, sticky="w")
                 widget.grid(row=row_num, column=2, padx=5, pady=5, sticky="ew")
                 widget.config(state=tk.NORMAL)
+                guide.grid(row=row_num,column=3,padx=5,pady=5,sticky="ew")
         else:
             # Caso fallback (es. opzione non in config, ma non è op[3])
             # o se l'opzione [3] non fosse gestita esplicitamente sopra
@@ -406,7 +429,7 @@ class ImageProcessingGUI:
         self.ymax_var.set("")
 
         for e in self.all_entries:
-            e.info_label.config(fg='gray')
+            e.info_label.config(fg='gray',cursor="arrow")
             e.info_label.tooltip.disable()
         # Aggiorna lo stato dei campi condizionali
         self._update_conditional_fields()
@@ -751,93 +774,101 @@ class ImageProcessingGUI:
         self.root.mainloop() 
 
 if __name__ == "__main__":
-    root = tk.Tk()
-    root.resizable(False, False)
-    app = ImageProcessingGUI(root)
-    while True:
-        app.submitted_successfully=False
-        app.run()
-        
-        # --- Recupero dei valori dopo che la GUI è stata chiusa (dal submit) ---
-        if app.submitted_successfully:
+    try:
+        root = tk.Tk()
+        root.resizable(False, False)
+        app = ImageProcessingGUI(root)
+        while True:
+            app.submitted_successfully=False
+            app.run()
             
-            print("\n--- Dati recuperati dalla GUI ---")
-            print(f"Percorso immagine: {app.image_path}")
-            print(f"Larghezza immagine: {app.image_width}")
-            print(f"Altezza immagine: {app.image_height}")
-            print(f"Centro X: {float(app.center_x_var.get())}")
-            print(f"Centro Y: {float(app.center_y_var.get())}")
-            print(f"X Min: {int(app.xmin_var.get())}")
-            print(f"X Max: {int(app.xmax_var.get())}")
-            print(f"Y Min: {int(app.ymin_var.get())}")
-            print(f"Y Max: {int(app.ymax_var.get())}")
-            print(f"Opzione selezionata: {app.combobox_choice.get()}")
-
-            # Recupera i parametri condizionali in base all'opzione scelta
-            selected_option = app.combobox_choice.get()
-            
-            o=app.params_process(selected_option)
-            if selected_option == app.options[0]:
-                print(f"  Rho Pixels: {int(app.rho_pixels_var.get())}")
-                print(f"  Theta Pixels: {int(app.theta_pixels_var.get())}")
-                print(f"  Std Dev Theta: {float(app.std_dev_theta_var.get())}")
-                print("SIZE",o.imold.shape)
-                imun = comet_pack.polarize(o.imold,o.nrad,o.ntheta,o.xnuc,o.ynuc)            
-                print("SIZE",imun.shape)
-                imien=comet_pack.azimuthal_average_division(imun,o.rejsig)
-                print("SIZE",imien.shape)
-                o.imn=comet_pack.reconstruct_from_polar(imien,o.NCOL,o.NROW,o.xnuc,o.ynuc,o.x_lower_lim,o.x_upper_lim,o.y_lower_lim,o.y_upper_lim)
-                print("SIZE",o.imn.shape)
-
-            elif selected_option == app.options[1]:
-                print(f"  Rho Pixels: {int(app.rho_pixels_var.get())}")
-                print(f"  Theta Pixels: {int(app.theta_pixels_var.get())}") 
-                imiun = comet_pack.polarize(o.imold,o.nrad,o.ntheta,o.xnuc,o.ynuc)     
-                imien = comet_pack.azimuthal_median_division(imiun)
-                o.imn=comet_pack.reconstruct_from_polar(imien,o.NCOL,o.NROW,o.xnuc,o.ynuc,o.x_lower_lim,o.x_upper_lim,o.y_lower_lim,o.y_upper_lim)
-
-                    
-            
-            elif selected_option == app.options[2]:#RENORMALIZATION
-                print(f"  Rho Pixels: {int(app.rho_pixels_var.get())}")
-                print(f"  Theta Pixels: {int(app.theta_pixels_var.get())}")
-                print(f"  Std Dev Theta: {float(app.std_dev_theta_var.get())}")
-                print(f"  Min/Max Std Dev: {float(app.min_max_std_dev_var.get())}")
+            # --- Recupero dei valori dopo che la GUI è stata chiusa (dal submit) ---
+            if app.submitted_successfully:
                 
-                imiun = comet_pack.polarize(o.imold,o.nrad,o.ntheta,o.xnuc,o.ynuc)            
-                imien=comet_pack.azimuthal_renormalization(imiun,o.rejsig,o.nsig)
-                o.imn=comet_pack.reconstruct_from_polar(imien,o.NCOL,o.NROW,o.xnuc,o.ynuc,o.x_lower_lim,o.x_upper_lim,o.y_lower_lim,o.y_upper_lim)
+                print("\n--- Dati recuperati dalla GUI ---")
+                print(f"Percorso immagine: {app.image_path}")
+                print(f"Larghezza immagine: {app.image_width}")
+                print(f"Altezza immagine: {app.image_height}")
+                print(f"Centro X: {float(app.center_x_var.get())}")
+                print(f"Centro Y: {float(app.center_y_var.get())}")
+                print(f"X Min: {int(app.xmin_var.get())}")
+                print(f"X Max: {int(app.xmax_var.get())}")
+                print(f"Y Min: {int(app.ymin_var.get())}")
+                print(f"Y Max: {int(app.ymax_var.get())}")
+                print(f"Opzione selezionata: {app.combobox_choice.get()}")
 
-            elif selected_option == app.options[3]:
-                o.imn=comet_pack.enhance_inverserho_vectorized(o.imold,o.xnuc,o.ynuc,o.x_lower_lim,o.x_upper_lim,o.y_lower_lim,o.y_upper_lim)    
+                # Recupera i parametri condizionali in base all'opzione scelta
+                selected_option = app.combobox_choice.get()
+                
+                o=app.params_process(selected_option)
+                if selected_option == app.options[0]:
+                    print(f"  Rho Pixels: {int(app.rho_pixels_var.get())}")
+                    print(f"  Theta Pixels: {int(app.theta_pixels_var.get())}")
+                    print(f"  Std Dev Theta: {float(app.std_dev_theta_var.get())}")
+                    print("SIZE",o.imold.shape)
+                    imun = comet_pack.polarize(o.imold,o.nrad,o.ntheta,o.xnuc,o.ynuc)            
+                    print("SIZE",imun.shape)
+                    imien=comet_pack.azimuthal_average_division(imun,o.rejsig)
+                    print("SIZE",imien.shape)
+                    o.imn=comet_pack.reconstruct_from_polar(imien,o.NCOL,o.NROW,o.xnuc,o.ynuc,o.x_lower_lim,o.x_upper_lim,o.y_lower_lim,o.y_upper_lim)
+                    print("SIZE",o.imn.shape)
 
-            elif selected_option == app.options[4]:
-                print(f"  Kernel A Term: {float(app.kernel_a_term_var.get())}")
-                print(f"  Kernel B Term: {float(app.kernel_b_term_var.get())}")
-                print(f"  Kernel N Term: {float(app.kernel_n_term_var.get())}")
-                print(f"  Transform Log: {app.transform_log_var.get()}")
-                o.imn = comet_pack.radially_variable_spatial_filtering(o.imold,o.A,o.B,o.N,o.NUMLOG,o.xnuc,o.ynuc,o.x_lower_lim,o.x_upper_lim,o.y_lower_lim,o.y_upper_lim)
-            app.submit_button.config(state=tk.DISABLED)
-            print("SHAPE USCITA",o.imn.shape) 
-            comet_pack.interactive_image_viewer(o)
-            #TODO: GESTIRE ERRORE DI CHIUSURA APP PRIMA DEL VISUALIZZATORE
-            #ho notato che se si chiama interactive_image_viewer senza cambiare stato al bottone
-            #l'applicazione continua a lavorare
-            #magari si può gestire la chiamata all'elaborazione direttamente dalla funzione del bottone
-            #così da rendere il flusso dell'applicazione indipendente dal resto
+                elif selected_option == app.options[1]:
+                    print(f"  Rho Pixels: {int(app.rho_pixels_var.get())}")
+                    print(f"  Theta Pixels: {int(app.theta_pixels_var.get())}") 
+                    imiun = comet_pack.polarize(o.imold,o.nrad,o.ntheta,o.xnuc,o.ynuc)     
+                    imien = comet_pack.azimuthal_median_division(imiun)
+                    o.imn=comet_pack.reconstruct_from_polar(imien,o.NCOL,o.NROW,o.xnuc,o.ynuc,o.x_lower_lim,o.x_upper_lim,o.y_lower_lim,o.y_upper_lim)
+
+                        
+                
+                elif selected_option == app.options[2]:#RENORMALIZATION
+                    print(f"  Rho Pixels: {int(app.rho_pixels_var.get())}")
+                    print(f"  Theta Pixels: {int(app.theta_pixels_var.get())}")
+                    print(f"  Std Dev Theta: {float(app.std_dev_theta_var.get())}")
+                    print(f"  Min/Max Std Dev: {float(app.min_max_std_dev_var.get())}")
+                    
+                    imiun = comet_pack.polarize(o.imold,o.nrad,o.ntheta,o.xnuc,o.ynuc)            
+                    imien=comet_pack.azimuthal_renormalization(imiun,o.rejsig,o.nsig)
+                    o.imn=comet_pack.reconstruct_from_polar(imien,o.NCOL,o.NROW,o.xnuc,o.ynuc,o.x_lower_lim,o.x_upper_lim,o.y_lower_lim,o.y_upper_lim)
+
+                elif selected_option == app.options[3]:
+                    o.imn=comet_pack.enhance_inverserho_vectorized(o.imold,o.xnuc,o.ynuc,o.x_lower_lim,o.x_upper_lim,o.y_lower_lim,o.y_upper_lim)    
+
+                elif selected_option == app.options[4]:
+                    print(f"  Kernel A Term: {float(app.kernel_a_term_var.get())}")
+                    print(f"  Kernel B Term: {float(app.kernel_b_term_var.get())}")
+                    print(f"  Kernel N Term: {float(app.kernel_n_term_var.get())}")
+                    print(f"  Transform Log: {app.transform_log_var.get()}")
+                    o.imn = comet_pack.radially_variable_spatial_filtering(o.imold,o.A,o.B,o.N,o.NUMLOG,o.xnuc,o.ynuc,o.x_lower_lim,o.x_upper_lim,o.y_lower_lim,o.y_upper_lim)
+                app.submit_button.config(state=tk.DISABLED,cursor="arrow")
+                #print("SHAPE USCITA",o.imn.shape) 
+                comet_pack.interactive_image_viewer(o)
+                #TODO: GESTIRE ERRORE DI CHIUSURA APP PRIMA DEL VISUALIZZATORE
+                #ho notato che se si chiama interactive_image_viewer senza cambiare stato al bottone
+                #l'applicazione continua a lavorare
+                #magari si può gestire la chiamata all'elaborazione direttamente dalla funzione del bottone
+                #così da rendere il flusso dell'applicazione indipendente dal resto
 
 
-            try:
-                app.submit_button.config(state=tk.NORMAL)
-            except tk.TclError as e:
+                try:
+                    app.submit_button.config(state=tk.NORMAL,cursor="hand2")
+                    
+                except tk.TclError as e:
+                    print("\nL'utente ha chiuso la finestra")
+                    sys.exit()
+                
+                
+                
+                
+                
+            else:
                 print("\nL'utente ha chiuso la finestra")
                 sys.exit()
-            
-            
-            
-            
-            
-        else:
-            print("\nL'utente ha chiuso la finestra")
-            sys.exit()
+    except MemoryError:
+        messagebox.showerror("Errore","La memoria del sistema non è sufficiente a completare l'elaborazione")
+        print("Errore: Memoria esaurita! (MemoryError)")
+    except Exception as e:
+        messagebox.showerror("Errore",f"Si è verificato un altro errore: {e}")
+        print(f"Si è verificato un altro errore: {e}")
     
