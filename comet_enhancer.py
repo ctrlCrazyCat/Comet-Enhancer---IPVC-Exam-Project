@@ -269,7 +269,7 @@ class ImageProcessingGUI:
         
         o.ynuc=float(self.entry_center_y.get())-1.0
         o.xnuc=float(self.entry_center_x.get())-1.0
-        [hdul,imold]=comet_pack.get_input_data(self.image_path)
+        [hdul,imold,log_abeled]=comet_pack.get_input_data(self.image_path)
         o.hdul = hdul
         o.imold = imold
         (o.NROW,o.NCOL)= imold.shape
@@ -692,7 +692,7 @@ class ImageProcessingGUI:
         self._update_conditional_fields() # Aggiorna la visibilità e lo stato dei campi
         self._validate_all_inputs() # Forza una validazione completa
 
-    
+
     def _data_warning(self):
         detail_string=""
         if not self.validations.main_inputs_valid:
@@ -808,7 +808,7 @@ if __name__ == "__main__":
                     print("SIZE",o.imold.shape)
                     imun = comet_pack.polarize(o.imold,o.nrad,o.ntheta,o.xnuc,o.ynuc)            
                     print("SIZE",imun.shape)
-                    imien=comet_pack.azimuthal_average_division(imun,o.rejsig)
+                    imien=comet_pack.azimuthal_average_division_vectorized(imun,o.rejsig)
                     print("SIZE",imien.shape)
                     o.imn=comet_pack.reconstruct_from_polar(imien,o.NCOL,o.NROW,o.xnuc,o.ynuc,o.x_lower_lim,o.x_upper_lim,o.y_lower_lim,o.y_upper_lim)
                     print("SIZE",o.imn.shape)
@@ -817,7 +817,7 @@ if __name__ == "__main__":
                     print(f"  Rho Pixels: {int(app.rho_pixels_var.get())}")
                     print(f"  Theta Pixels: {int(app.theta_pixels_var.get())}") 
                     imiun = comet_pack.polarize(o.imold,o.nrad,o.ntheta,o.xnuc,o.ynuc)     
-                    imien = comet_pack.azimuthal_median_division(imiun)
+                    imien = comet_pack.azimuthal_median_division_vectorized(imiun)
                     o.imn=comet_pack.reconstruct_from_polar(imien,o.NCOL,o.NROW,o.xnuc,o.ynuc,o.x_lower_lim,o.x_upper_lim,o.y_lower_lim,o.y_upper_lim)
 
                         
@@ -829,18 +829,18 @@ if __name__ == "__main__":
                     print(f"  Min/Max Std Dev: {float(app.min_max_std_dev_var.get())}")
                     
                     imiun = comet_pack.polarize(o.imold,o.nrad,o.ntheta,o.xnuc,o.ynuc)            
-                    imien=comet_pack.azimuthal_renormalization(imiun,o.rejsig,o.nsig)
+                    imien=comet_pack.azimuthal_renormalization_vectorized(imiun,o.rejsig,o.nsig)
                     o.imn=comet_pack.reconstruct_from_polar(imien,o.NCOL,o.NROW,o.xnuc,o.ynuc,o.x_lower_lim,o.x_upper_lim,o.y_lower_lim,o.y_upper_lim)
 
                 elif selected_option == app.options[3]:
-                    o.imn=comet_pack.enhance_inverserho_vectorized(o.imold,o.xnuc,o.ynuc,o.x_lower_lim,o.x_upper_lim,o.y_lower_lim,o.y_upper_lim)    
+                    o.imn=comet_pack.inverserho_vectorized(o.imold,o.xnuc,o.ynuc,o.x_lower_lim,o.x_upper_lim,o.y_lower_lim,o.y_upper_lim)    
 
                 elif selected_option == app.options[4]:
                     print(f"  Kernel A Term: {float(app.kernel_a_term_var.get())}")
                     print(f"  Kernel B Term: {float(app.kernel_b_term_var.get())}")
                     print(f"  Kernel N Term: {float(app.kernel_n_term_var.get())}")
                     print(f"  Transform Log: {app.transform_log_var.get()}")
-                    o.imn = comet_pack.radially_variable_spatial_filtering(o.imold,o.A,o.B,o.N,o.NUMLOG,o.xnuc,o.ynuc,o.x_lower_lim,o.x_upper_lim,o.y_lower_lim,o.y_upper_lim)
+                    o.imn = comet_pack.radially_variable_spatial_filtering_vectorized(o.imold,o.A,o.B,o.N,o.NUMLOG,o.xnuc,o.ynuc,o.x_lower_lim,o.x_upper_lim,o.y_lower_lim,o.y_upper_lim)
                 app.submit_button.config(state=tk.DISABLED,cursor="arrow")
                 #print("SHAPE USCITA",o.imn.shape) 
                 comet_pack.interactive_image_viewer(o)
@@ -872,3 +872,5 @@ if __name__ == "__main__":
         messagebox.showerror("Errore",f"Si è verificato un altro errore: {e}")
         print(f"Si è verificato un altro errore: {e}")
     
+
+#TODO: dati nucleo mancanti su rho al submit

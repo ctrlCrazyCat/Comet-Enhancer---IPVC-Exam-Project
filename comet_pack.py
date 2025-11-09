@@ -8,6 +8,7 @@ from matplotlib.widgets import RangeSlider,Button
 from matplotlib.cm import get_cmap
 import tkinter as tk
 from tkinter import filedialog as fd,messagebox
+
 TWOPI = 2*np.pi
 
 class Params:
@@ -31,10 +32,14 @@ def get_input_data(filepath):
     imold[np.isnan(imold)] = np.min(imold[~np.isnan(imold)])
     imold=imold.astype(float)
     imold = 100*imold/np.mean(imold)
+    log_abeled = True
+    if np.min(imold)<=0:
+        log_abeled=False
+    print("LLAAA")
     
-    return hdul,imold
+    return hdul,imold,log_abeled
 
-def enhance_inverserho_vectorized(imold: np.ndarray, xnuc: float, ynuc: float,xmin:int,xmax:int,ymin:int,ymax:int) -> np.ndarray:
+def inverserho_vectorized(imold: np.ndarray, xnuc: float, ynuc: float,xmin:int,xmax:int,ymin:int,ymax:int) -> np.ndarray:
     """
     Esegue il miglioramento "inverserho" (moltiplicazione per rho) su un'immagine.
     
@@ -128,25 +133,9 @@ def enhance_inverserho_vectorized(imold: np.ndarray, xnuc: float, ynuc: float,xm
     print("LIMITI: ",ymin,ymax,xmin,xmax)
     return imn[ymin:ymax,xmin:xmax]
 
-def rho_division(imold,xnuc:float,ynuc:float,xmin:int,xmax:int,ymin:int,ymax:int):
-    (NROW,NCOL) = imold.shape
-    linspace_vec = 0.1*np.linspace(1,10,10)
-    i_coords = np.arange(NROW).reshape(-1, 1) # (lcol, 1) per broadcasting
-    ynew_vec_all = np.square(ynuc - i_coords - 0.55 + linspace_vec) # (lcol, 10)
-    j_coords = np.arange(NCOL).reshape(-1, 1) # (lrow, 1) per broadcasting
-    xnew_vec_all = np.square(xnuc - j_coords - 0.55 + linspace_vec) # (lrow, 10)
-    ynew_vec_expanded = ynew_vec_all[:, np.newaxis, :, np.newaxis] # (lcol, 1, 10, 1)
-    xnew_vec_expanded = xnew_vec_all[np.newaxis, :, np.newaxis, :] # (1, lrow, 1, 10)
-    sum_of_squares_all = xnew_vec_expanded + ynew_vec_expanded
-    sqrt_values_all = np.sqrt(sum_of_squares_all)
-    rho_all = np.sum(sqrt_values_all, axis=(-2, -1)) # Somma sulle ultime due dimensioni
-    rho_all = rho_all * 0.01
-    imn = imold * rho_all
-    return imn[ymin:ymax-1,xmin:xmax-1]
 
 
-
-def azimuthal_median_division(imiun):
+def azimuthal_median_division_vectorized(imiun):
     (nrad,ntheta)=imiun.shape
     jjj_all = np.sum(imiun < 0.0, axis=1)
     sorted_bvect_all = np.sort(imiun, axis=1)
@@ -158,7 +147,7 @@ def azimuthal_median_division(imiun):
     return imien
 
 
-def azimuthal_average_division(imiun,rejsig):
+def azimuthal_average_division_vectorized(imiun,rejsig):
     mask_pass1 = (imiun >= 0.0)
     jj_all = np.sum(mask_pass1, axis=1)
     sum_pass1 = np.sum(imiun * mask_pass1, axis=1)
@@ -182,7 +171,7 @@ def azimuthal_average_division(imiun,rejsig):
     return imien
 
 
-def azimuthal_renormalization(imiun,rejsig,nsig):
+def azimuthal_renormalization_vectorized(imiun,rejsig,nsig):
     
     (nrad,ntheta)=imiun.shape
     imien = np.zeros((nrad, ntheta))
@@ -444,10 +433,11 @@ def polarize(imold,nrad,ntheta,xnuc:float,ynuc:float):
     imiun[small_value_mask] = -1
     return imiun
 
-def radially_variable_spatial_filtering(imold,A,B,N,NUMLOG,xnuc,ynuc,xmin,xmax,ymin,ymax):
+def radially_variable_spatial_filtering_vectorized(imold,A,B,N,NUMLOG,xnuc,ynuc,xmin,xmax,ymin,ymax):
     imavg=np.mean(imold)
     imold=imold*100.0/imavg
     (numrows,numcols)=imold.shape
+    #TODO: Warning
     if NUMLOG:
         if imold[imold<=1e-15].shape[0] ==0:
             imold=np.log10(imold)
@@ -553,7 +543,7 @@ def radially_variable_spatial_filtering(imold,A,B,N,NUMLOG,xnuc,ynuc,xmin,xmax,y
 
 
 
-#TODO: GESTIRE CASO IMMAGINE MONOCOLORE (DATAMAX == DATAMIN)
+
 def interactive_image_viewer(p:Params, gamma_step=0.05):
     """
     Mostra un'immagine astronomica in modo interattivo con controlli per lo stretching 
@@ -720,7 +710,6 @@ def interactive_image_viewer(p:Params, gamma_step=0.05):
 
 
 def save_enhanced_image(p:Params):
-    print()
     directory_path = os.path.basename(p.input_path)
     temp = p.input_path.split('.',1)
     print(temp)
@@ -763,5 +752,28 @@ def save_enhanced_image(p:Params):
     p.hdul[0].header['AVISUMIN']=np.min(p.imn)
     p.hdul[0].header['DATAMAX']=np.max(p.imn)
     p.hdul[0].header['AVISUMAX']=np.max(p.imn)
+
+    p.hdul[0].header['INP_IM']=(p.input_path,'input image name')
+    p.hdul[0].header['NUC-X']=(p.xnuc,'optocenter X pixel value')
+    p.hdul[0].header['NUC-Y']=(p.ynuc,'optocenter Y pixel value')
+
+
+          
+        
+    if p.option ==OPTIONS[4]:
+        if p.NUMLOG:
+            p.hdul[0].header['NUMLOG']=(1,'numlog=1 => logarithmic image')
+        else:
+            p.hdul[0].header['NUMLOG']=(0,'numlog ne 1 => no logarithmic image')
+        p.hdul[0].header['A']=(p.A,'coeffcicent a')
+        p.hdul[0].header['B']=(p.B,'coefficent b')
+        
+        p.hdul[0].header['A']=(p.A,'coeffcicent a')
+    else:
+        p.hdul[0].header['ENH-RAD']=(p.nrad,'diameter=1+(2*radius)')
+
+
+
+
     p.hdul.writeto(filepath,overwrite=True)
 
