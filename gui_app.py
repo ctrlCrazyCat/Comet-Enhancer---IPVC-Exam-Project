@@ -302,7 +302,7 @@ class ImageProcessingGUI:
             except ZeroDivisionError as e:
                 o.rejsig = float('inf')
 
-        if selected_option == OPTIONS[1]:
+        if option == OPTIONS[1]:
             o.nrad=int(self.rho_pixels_var.get())
             o.ntheta=int(self.theta_pixels_var.get()) 
 
