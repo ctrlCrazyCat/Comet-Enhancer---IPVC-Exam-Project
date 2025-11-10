@@ -37,7 +37,7 @@ def preprocess_and_normalize_crop(imold: np.ndarray, xnuc: float, ynuc: float,
     # che corrisponde a come la GUI passa xmax/ymax.
     im_cropped = imold[ymin:ymax, xmin:xmax].copy()
 
-    print("CROPPED SIZE ",im_cropped.shape)
+    
 
     # --- 2. Normalizza il ritaglio (come i loop 100-101) ---
     mean_crop = np.mean(im_cropped)
@@ -54,7 +54,7 @@ def preprocess_and_normalize_crop(imold: np.ndarray, xnuc: float, ynuc: float,
     # Esempio: xnuc=50.5 (assoluto) e xmin=10. Il nuovo xnuc_rel sarà 40.5
     xnuc_rel = xnuc - xmin
     ynuc_rel = ynuc - ymin
-    print(xnuc_rel,ynuc_rel,"REAL NUX")
+    
     return im_processed, xnuc_rel, ynuc_rel
     
 def polarize(imold,nrad,ntheta,xnuc:float,ynuc:float):
@@ -74,7 +74,7 @@ def polarize(imold,nrad,ntheta,xnuc:float,ynuc:float):
     aarray_renorm = imold * renorm
 
     (NROW,NCOL) = imold.shape
-    print("row",NROW,"col",NCOL)
+    
     mtheta=ntheta*10
     fmthet=float(mtheta)
     angle = (np.arange(mtheta + 1, dtype=float) - 0.5) * (TWOPI / fmthet)
@@ -445,10 +445,10 @@ def inverserho_vectorized(imold: np.ndarray, xnuc: float, ynuc: float,outshapex:
     
     # x_sub_grid avrà forma (NROW, NCOL, 10, 1)
     # y_sub_grid avrà forma (NROW, NCOL, 1, 10)
-    print("QUIAADSAD")
+    
     x_sub_grid = x_dist_centers[..., np.newaxis, np.newaxis] + sub_offsets[np.newaxis, :]
     y_sub_grid = y_dist_centers[..., np.newaxis, np.newaxis] + sub_offsets[:, np.newaxis]
-    print("QUIAADSAD2")
+    
     # Tramite broadcasting, x_sub_grid e y_sub_grid creano una
     # griglia 10x10 di coordinate (xnew, ynew) per ogni pixel (NROW, NCOL)
     
@@ -471,8 +471,7 @@ def inverserho_vectorized(imold: np.ndarray, xnuc: float, ynuc: float,outshapex:
     out=np.zeros((outshapey,outshapex))
     (imn_shape_y,imn_shape_x)=imn.shape
     out[0:imn_shape_y,0:imn_shape_x]=imn
-    print("IMN SHAPE",imn.shape)
-    print("OUT SHAPE",out.shape)
+
     return out
 
 
@@ -551,9 +550,9 @@ def radially_variable_spatial_filtering_vectorized(imold,A,B,N,NUMLOG,xnuc,ynuc,
                             (jjj_edge >= 0) & (jjj_edge < numcols) & \
                             (((all_delta_i_edge == 0) & (all_delta_j_edge != 0)) | \
                             ((all_delta_j_edge == 0) & (all_delta_i_edge != 0)))
-        print("ADASD",imold.shape)
+        
         valid_imold_values_edge = imold[iii_edge[valid_mask_edge], jjj_edge[valid_mask_edge]]
-        print("QUIIIIIIASD")
+        
         # Mappa i contributi ai pixel (i,j) originali nella riga corrente
         target_j_flat_edge = j_base_flat_repeated[valid_mask_edge]
         
@@ -589,8 +588,7 @@ def radially_variable_spatial_filtering_vectorized(imold,A,B,N,NUMLOG,xnuc,ynuc,
     out=np.zeros((outshapey,outshapex))
     (imn_shape_y,imn_shape_x)=imn.shape
     out[0:imn_shape_y,0:imn_shape_x]=imn
-    print("IMN SHAPE",imn.shape)
-    print("OUT SHAPE",out.shape)
+
     return out
 
 
