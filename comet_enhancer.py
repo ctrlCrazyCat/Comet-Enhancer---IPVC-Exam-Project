@@ -245,7 +245,7 @@ class ImageProcessingGUI:
                 "info_label":_get_info_label(self.conditional_params_frame),
                 "widget": tk.Checkbutton(self.conditional_params_frame, variable=self.transform_log_var, text="Sì"),
                 "variable": self.transform_log_var,
-                "guide":_get_guide_label(self.conditional_params_frame,"Questa opzione permette di riscalare l'immagine nello spazio log-10 prima che la procedura di miglioramento venga avviata.\nLa presenza di pixel negativi non permetterà la trasformazione logaritmica.\nPuoi controllare il valore 'logarithmic image' nell'header dell'immagine migliorata per avere la certezza che la trasformazione sia stata applicata.")#TODO:HEADER PER QUESTA COSA
+                "guide":_get_guide_label(self.conditional_params_frame,"Questa opzione permette di riscalare l'immagine nello spazio log-10 prima che la procedura di miglioramento venga avviata.\nLa presenza di pixel negativi non permetterà la trasformazione logaritmica.\nPuoi controllare il valore 'logarithmic image' nell'header dell'immagine migliorata per avere la certezza che la trasformazione sia stata applicata.")
             }
         }
         
@@ -339,6 +339,7 @@ class ImageProcessingGUI:
                     self.image_height=hdul[0].header['NAXIS2']
                     self.imold[np.isnan(self.imold)] = np.min(self.imold[~np.isnan(self.imold)])
                     if np.min(self.imold)<=0:
+                        self.transform_log_var.set(False)
                         self.log_abeled = False
                     
                 self.image_info_label.config(text=f"Immagine: {self.image_path.split('/')[-1]} ({self.image_width}x{self.image_height})")
@@ -814,7 +815,8 @@ def interactive_image_viewer(p:Params, gamma_step=0.05):
     """
     
     # Rimuovi i valori NaN e assicurati che i dati siano float32
-    data = cv2.flip(p.imn.astype(np.float32),0)
+    data = p.imn[0:p.x_upper_lim-p.x_lower_lim,0:p.y_upper_lim-p.y_lower_lim]
+    data = cv2.flip(data.astype(np.float32),0)
     data[np.isnan(data)] = np.min(data[~np.isnan(data)])
 
     # --- Calcolo Range Iniziale ---
@@ -1074,7 +1076,7 @@ if __name__ == "__main__":
                     print(f"  Rho Pixels: {int(app.rho_pixels_var.get())}")
                     print(f"  Theta Pixels: {int(app.theta_pixels_var.get())}")
                     print(f"  Std Dev Theta: {float(app.std_dev_theta_var.get())}")
-                    #TODO: GESTIRE IL CROP
+                    
                     #TODO: AGGIUNGERE CHE AL CROP IL NUCLEO DEVE STARE DENTRO
                     imun = comet_pack.polarize(imold_preprocessed,o.nrad,o.ntheta,xnuc_rel,xnuc_rel)          
                     imien=comet_pack.azimuthal_average_division_vectorized(imun,o.rejsig)
@@ -1109,7 +1111,7 @@ if __name__ == "__main__":
                     print(f"  Kernel B Term: {float(app.kernel_b_term_var.get())}")
                     print(f"  Kernel N Term: {float(app.kernel_n_term_var.get())}")
                     print(f"  Transform Log: {app.transform_log_var.get()}")
-                    o.imn = comet_pack.radially_variable_spatial_filtering_vectorized(app.imold,o.A,o.B,o.N,o.NUMLOG,o.xnuc,o.ynuc,o.x_lower_lim,o.x_upper_lim,o.y_lower_lim,o.y_upper_lim)
+                    o.imn = comet_pack.radially_variable_spatial_filtering_vectorized(imold_preprocessed,o.A,o.B,o.N,o.NUMLOG,xnuc_rel,ynuc_rel,o.NCOL,o.NROW)
                 app.submit_button.config(state=tk.DISABLED,cursor="arrow")
                 #print("SHAPE USCITA",o.imn.shape) 
                 interactive_image_viewer(o)

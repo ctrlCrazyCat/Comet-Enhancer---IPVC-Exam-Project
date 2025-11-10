@@ -477,20 +477,20 @@ def inverserho_vectorized(imold: np.ndarray, xnuc: float, ynuc: float,outshapex:
 
 
 
-def radially_variable_spatial_filtering_vectorized(imold,A,B,N,NUMLOG,xnuc,ynuc,xmin,xmax,ymin,ymax):
-    im_cropped = imold[ymin:ymax, xmin:xmax].copy()
-    im_cropped = 100.0 * im_cropped / np.mean(im_cropped)
-    xnuc_new = xnuc - xmin
-    ynuc_new = ynuc - ymin
+def radially_variable_spatial_filtering_vectorized(imold,A,B,N,NUMLOG,xnuc,ynuc,outshapex:int,outshapey:int):
+    # im_cropped = imold[ymin:ymax, xmin:xmax].copy()
+    # im_cropped = 100.0 * im_cropped / np.mean(im_cropped)
+    # xnuc_new = xnuc - xmin
+    # ynuc_new = ynuc - ymin
     
-    #TODO: Warning
+    # #TODO: Warning
     if NUMLOG:
-        if im_cropped[im_cropped<=1e-15].shape[0] ==0:
-            im_cropped=np.log10(im_cropped)
+        if imold[imold<=1e-15].shape[0] ==0:
+            imold=np.log10(imold)
         else:
             NUMLOG=False     #SERVE PER SCRIVERLO NEL FITS
-    imn = np.zeros_like(im_cropped)
-    (numrows,numcols)=im_cropped.shape
+    imn = np.zeros_like(imold)
+    (numrows,numcols)=imold.shape
     
 
     # Pre-calcolo delle coordinate sub-pixel m e n
@@ -520,7 +520,7 @@ def radially_variable_spatial_filtering_vectorized(imold,A,B,N,NUMLOG,xnuc,ynuc,
         an_expanded = an_grid_subpixel[np.newaxis, np.newaxis, :, :] # (1, 1, 10, 10)
 
         # rho avrà forma (1, xlim, 10, 10)
-        rho = np.sqrt(np.square(J_coords - xnuc_new + am_expanded) + np.square(float(i) - ynuc_new + an_expanded))
+        rho = np.sqrt(np.square(J_coords - xnuc + am_expanded) + np.square(float(i) - ynuc + an_expanded))
         a0 = A + (B * (np.power(rho, N))) # a0 ha forma (1, xlim, 10, 10)
         
         # Arrotonda e appiattisci a0 per gli offset
@@ -551,8 +551,8 @@ def radially_variable_spatial_filtering_vectorized(imold,A,B,N,NUMLOG,xnuc,ynuc,
                             (jjj_edge >= 0) & (jjj_edge < numcols) & \
                             (((all_delta_i_edge == 0) & (all_delta_j_edge != 0)) | \
                             ((all_delta_j_edge == 0) & (all_delta_i_edge != 0)))
-        print("ADASD",im_cropped.shape)
-        valid_imold_values_edge = im_cropped[iii_edge[valid_mask_edge], jjj_edge[valid_mask_edge]]
+        print("ADASD",imold.shape)
+        valid_imold_values_edge = imold[iii_edge[valid_mask_edge], jjj_edge[valid_mask_edge]]
         print("QUIIIIIIASD")
         # Mappa i contributi ai pixel (i,j) originali nella riga corrente
         target_j_flat_edge = j_base_flat_repeated[valid_mask_edge]
@@ -577,7 +577,7 @@ def radially_variable_spatial_filtering_vectorized(imold,A,B,N,NUMLOG,xnuc,ynuc,
                             (jjj_crn >= 0) & (jjj_crn < numcols) & \
                             (all_delta_i_crn != 0) & (all_delta_j_crn != 0)
 
-        valid_imold_values_crn = im_cropped[iii_crn[valid_mask_crn], jjj_crn[valid_mask_crn]]
+        valid_imold_values_crn = imold[iii_crn[valid_mask_crn], jjj_crn[valid_mask_crn]]
         
         target_j_flat_crn = j_base_flat_repeated[valid_mask_crn]
 
@@ -585,9 +585,13 @@ def radially_variable_spatial_filtering_vectorized(imold,A,B,N,NUMLOG,xnuc,ynuc,
         total_sumcrn_row = summed_contributions_crn * 1.0e-2
 
         # Calcolo finale di imn per la riga 'i' corrente
-        imn[i, :] = 1024.0 * im_cropped[i, :] - 192.0 * total_sumedg_row - 64.0 * total_sumcrn_row
-        
-    return imn
+        imn[i, :] = 1024.0 * imold[i, :] - 192.0 * total_sumedg_row - 64.0 * total_sumcrn_row
+    out=np.zeros((outshapey,outshapex))
+    (imn_shape_y,imn_shape_x)=imn.shape
+    out[0:imn_shape_y,0:imn_shape_x]=imn
+    print("IMN SHAPE",imn.shape)
+    print("OUT SHAPE",out.shape)
+    return out
 
 
 
