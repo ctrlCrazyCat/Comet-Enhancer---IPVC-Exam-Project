@@ -6,7 +6,7 @@ import numpy as np
 TWOPI = 2*np.pi
 
 
-def preprocess_and_normalize_crop(imold: np.ndarray, xnuc: float, ynuc: float, 
+def preprocess_normalize_and_crop(imold: np.ndarray, xnuc: float, ynuc: float, 
                                   xmin: int, xmax: int, ymin: int, ymax: int) -> tuple:
     """
     Ritaglia l'immagine, normalizza il ritaglio e ricalcola le coordinate del nucleo.

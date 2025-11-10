@@ -19,8 +19,7 @@ import tkinter as tk
 matplotlib.use('TkAgg')
 
 from tooltip import Tooltip
-#TODO: DIVIDERE MAIN DA LIBRERIA
-#TODO: ELIMINARE PRINT INUTILI
+#TODO: SPOSTARE controllo logaritmo in preprocess comet pack
 
 class Params:
     def __init__(self):

@@ -33,7 +33,7 @@ if __name__ == "__main__":
                 
                 o=app.params_process(selected_option)
                 
-                (imold_preprocessed, xnuc_rel, ynuc_rel) = comet_pack.preprocess_and_normalize_crop(app.imold,o.xnuc,o.ynuc,o.x_lower_lim,o.x_upper_lim,o.y_lower_lim,o.y_upper_lim)
+                (imold_preprocessed, xnuc_rel, ynuc_rel) = comet_pack.preprocess_normalize_and_crop(app.imold,o.xnuc,o.ynuc,o.x_lower_lim,o.x_upper_lim,o.y_lower_lim,o.y_upper_lim)
                 
                 if selected_option == OPTIONS[0]:
                     print(f"  Rho Pixels: {int(app.rho_pixels_var.get())}")
