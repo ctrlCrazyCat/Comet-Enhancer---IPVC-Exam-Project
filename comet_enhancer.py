@@ -19,7 +19,8 @@ import tkinter as tk
 matplotlib.use('TkAgg')
 
 from tooltip import Tooltip
-
+#TODO: DIVIDERE MAIN DA LIBRERIA
+#TODO: ELIMINARE PRINT INUTILI
 
 class Params:
     def __init__(self):
@@ -542,7 +543,7 @@ class ImageProcessingGUI:
             return (False,"non rappresenta un numero intero")
     
     
-    def _validate_all_inputs(self, *args):#TODO: da rivedere
+    def _validate_all_inputs(self, *args):
         """Funzione principale di validazione che gestisce lo stato di tutti i widget."""
         # args è presente qui a causa dei trace callback, ma non viene usato
         self.validations = Params
@@ -804,7 +805,7 @@ class ImageProcessingGUI:
             match self.validations.option:
                 case 0:
                     if not self.validations.rho_pixels_ok[0]:
-                        #TODO: riprodurre su tutto rho
+                        
                         if (not self.validations.all_center_ok) or not(self.validations.all_limits_ok) or (not self.limits_nucleus_ok):
                             detail_string=detail_string + "-Limiti per numero di pixel asse ρ (rho) non calcolabili\n"
                         else:
@@ -817,12 +818,20 @@ class ImageProcessingGUI:
                         detail_string = detail_string + "-Deviazioni standard  pixel asse θ "+self.validations.std_dev_theta_ok[1]+"\n"
                 case 1:
                     if not self.validations.rho_pixels_ok[0]:
-                        detail_string = detail_string + "-Numero di pixel asse ρ (rho) "+self.validations.rho_pixels_ok[1]+"\n"
+                        if (not self.validations.all_center_ok) or not(self.validations.all_limits_ok) or (not self.limits_nucleus_ok):
+                            detail_string=detail_string + "-Limiti per numero di pixel asse ρ (rho) non calcolabili\n"
+                        else:
+                            detail_string = detail_string + "-Numero di pixel asse ρ (rho) "+self.validations.rho_pixels_ok[1]+", sarà impostato "+str(self.rho_default)+" che corrisponde alla più grande circonfernza contenuta nell'immagine a partire dal nucelo\n"
+                            self.rho_pixels_var.set(str(self.rho_default))
                     if not self.validations.theta_pixels_ok[0]:
                         detail_string = detail_string + "-Numero di pixel asse θ "+self.validations.theta_pixels_ok[1]+"\n"
                 case 2:
                     if not self.validations.rho_pixels_ok[0]:
-                        detail_string = detail_string + "-Numero di pixel asse ρ (rho) "+self.validations.rho_pixels_ok[1]+"\n"
+                        if (not self.validations.all_center_ok) or not(self.validations.all_limits_ok) or (not self.limits_nucleus_ok):
+                            detail_string=detail_string + "-Limiti per numero di pixel asse ρ (rho) non calcolabili\n"
+                        else:
+                            detail_string = detail_string + "-Numero di pixel asse ρ (rho) "+self.validations.rho_pixels_ok[1]+", sarà impostato "+str(self.rho_default)+" che corrisponde alla più grande circonfernza contenuta nell'immagine a partire dal nucelo\n"
+                            self.rho_pixels_var.set(str(self.rho_default))
                     if not self.validations.theta_pixels_ok[0]:
                         detail_string = detail_string + "-Numero di pixel asse θ "+self.validations.theta_pixels_ok[1]+"\n"
                     if not self.validations.std_dev_theta_ok[0]:
@@ -868,7 +877,7 @@ def interactive_image_viewer(p:Params, gamma_step=0.05):
     """
     
     # Rimuovi i valori NaN e assicurati che i dati siano float32
-    data = p.imn[0:p.x_upper_lim-p.x_lower_lim,0:p.y_upper_lim-p.y_lower_lim]
+    data = p.imn[0:p.y_upper_lim-p.y_lower_lim,0:p.x_upper_lim-p.x_lower_lim]
     data = cv2.flip(data.astype(np.float32),0)
     data[np.isnan(data)] = np.min(data[~np.isnan(data)])
 
@@ -1130,7 +1139,7 @@ if __name__ == "__main__":
                     print(f"  Theta Pixels: {int(app.theta_pixels_var.get())}")
                     print(f"  Std Dev Theta: {float(app.std_dev_theta_var.get())}")
                     
-                    #TODO: AGGIUNGERE CHE AL CROP IL NUCLEO DEVE STARE DENTRO
+
                     imun = comet_pack.polarize(imold_preprocessed,o.nrad,o.ntheta,xnuc_rel,xnuc_rel)          
                     imien=comet_pack.azimuthal_average_division_vectorized(imun,o.rejsig)
                     
@@ -1166,13 +1175,9 @@ if __name__ == "__main__":
                     print(f"  Transform Log: {app.transform_log_var.get()}")
                     o.imn = comet_pack.radially_variable_spatial_filtering_vectorized(imold_preprocessed,o.A,o.B,o.N,o.NUMLOG,xnuc_rel,ynuc_rel,o.NCOL,o.NROW)
                 app.submit_button.config(state=tk.DISABLED,cursor="arrow")
-                #print("SHAPE USCITA",o.imn.shape) 
+
                 interactive_image_viewer(o)
-                #TODO: GESTIRE ERRORE DI CHIUSURA APP PRIMA DEL VISUALIZZATORE
-                #ho notato che se si chiama interactive_image_viewer senza cambiare stato al bottone
-                #l'applicazione continua a lavorare
-                #magari si può gestire la chiamata all'elaborazione direttamente dalla funzione del bottone
-                #così da rendere il flusso dell'applicazione indipendente dal resto
+
 
 
                 try:
@@ -1198,4 +1203,4 @@ if __name__ == "__main__":
     
 
 
-#TODO: rho deve essere limitato anche dal crop
+
