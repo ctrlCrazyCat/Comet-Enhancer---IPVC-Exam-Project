@@ -118,8 +118,7 @@ class ImageProcessingGUI:
         self.transform_log_var.trace("w", self._validate_all_inputs)
         
         # --- Creazione dei Widget ---
-#TODO:FARE IN MODO CHE IL TOOLTIP COMPARE ANCHE SE CLICCO
-#MAGARI RICHIAMANDO UNA FUNZIONE DEL TOOLTIP CHE GIA' ESISTE (SHOW)
+
         # Pulsante per scegliere l'immagine
         self.select_image_button = tk.Button(root, text="Scegli Immagine FIT/FITS", command=self._select_image,cursor="hand2") # Modificato il testo
         self.select_image_button.pack(pady=10)
@@ -492,9 +491,16 @@ class ImageProcessingGUI:
             return (True,"correttamente inserito")
         except ValueError:
             return (False,"non rappresenta un numero a virgola mobile")
-    def _validate_rho_input_and_approximate(self,all_center_ok:bool):
+    def _validate_rho_input_and_approximate(self,all_center_ok:bool,all_limits_ok:bool,limits_nucleus_ok:bool):
+        if (not all_center_ok) and (not all_limits_ok):
+            return (False,"dati sul Centro Nucleo Cometa e sui limiti di elaborazione non correttamente inseriti o assenti")
+        if not all_limits_ok:
+            return (False,"dati sui limiti di elaborazione non correttamente inseriti o assenti")
         if not all_center_ok:
             return (False,"dati sul Centro Nucleo Cometa non correttamente inseriti o assenti")
+        if not limits_nucleus_ok:
+            return (False,"i limiti di elaborazione non sono coerenti con le coordinate del Nucleo Cometa")
+        
         return self._validate_int_input_and_approximate(self.rho_pixels_var,1,self.rho_max)
     
 
@@ -554,15 +560,7 @@ class ImageProcessingGUI:
         all_center_ok = center_x_ok[0] and center_y_ok[0]
         all_ok.append(center_y_ok)
         self.validations.all_center_ok = all_center_ok
-        if all_center_ok:
-            xnuc = float(self.center_x_var.get())
-            ynuc = float(self.center_y_var.get())
-            xmax = max((self.image_width-xnuc),xnuc)
-            ymax =max((self.image_height-ynuc),ynuc)
-            xmin= min((self.image_width-xnuc),xnuc)
-            ymin = min((self.image_height-ynuc),ynuc)
-            self.rho_default= max(int(min(xmin,ymin)),1)
-            self.rho_max=int(np.floor((xmax**2+ymax**2)**0.5))
+        
 
 
 
@@ -577,7 +575,45 @@ class ImageProcessingGUI:
         all_ok.append(ymin_ok)
         ymax_ok = self._validate_int_input_and_approximate(self.ymax_var, min_val=1, max_val=self.image_height)
         all_ok.append(ymax_ok)
-        all_limits_ok = xmin_ok[0] and xmax_ok[0] and ymin_ok[0] and ymax_ok[0]
+        limits_x_ok = xmin_ok[0] and xmax_ok[0]
+        limits_y_ok = ymin_ok[0] and ymax_ok[0]
+        all_limits_ok = limits_x_ok and limits_y_ok
+
+        
+        xnuc = -1.0
+        ynuc = -1.0
+        xfin=-1.0
+        xint = -1.0
+        yfin=-1.0
+        yint = -1.0
+        
+        self.limits_nucleus_ok = True
+        if all_center_ok:
+            xnuc = float(self.center_x_var.get())
+            ynuc = float(self.center_y_var.get())
+
+
+            limits_nucleus_x_ok=True
+            if limits_x_ok:
+                xfin=float(self.xmax_var.get())
+                xint = float(self.xmin_var.get())
+                limits_nucleus_x_ok = xnuc<=xfin and xnuc >= xint 
+            limits_nucleus_y_ok=True
+            if limits_y_ok:
+                yfin=float(self.ymax_var.get())
+                yint = float(self.ymin_var.get())
+                limits_nucleus_y_ok = ynuc <= yfin and ynuc >= yint
+            self.limits_nucleus_ok = limits_nucleus_x_ok and limits_nucleus_y_ok
+            if not self.limits_nucleus_ok:
+                self.limits_nucleus_x_ok=limits_nucleus_x_ok
+                self.limits_nucleus_y_ok=limits_nucleus_y_ok
+
+            if all_limits_ok:
+                xmax = max((xfin-xnuc),(xnuc-xint))
+                ymax =max((yfin-ynuc),(ynuc-yint))
+                self.rho_max=int(np.floor((xmax**2+ymax**2)**0.5))
+                self.rho_default= int(min((xfin-xnuc),(xnuc-xint),(yfin-ynuc),(ynuc-yint)))
+
         
 
         for i, entry_widget in enumerate(self.all_entries):
@@ -586,6 +622,7 @@ class ImageProcessingGUI:
 
         min_max_ok = False
         self.validations.all_limits_ok = all_limits_ok
+        
         if all_limits_ok:
             x_min_max_ok = (int(self.xmin_var.get()) < int(self.xmax_var.get()))
             if not x_min_max_ok:
@@ -597,8 +634,15 @@ class ImageProcessingGUI:
                 conditional_config(self.entry_ymin.info_label,(False,"Limite inferiore X maggiore o uguale al limite superiore"))
             min_max_ok = x_min_max_ok and y_min_max_ok
             self.validations.min_max_ok = min_max_ok
+        if not self.limits_nucleus_ok:
+            if not self.limits_nucleus_x_ok:
+                conditional_config(self.entry_xmax.info_label,(False,"Il range di valori sull'asse X non contniene il Nucleo Cometa"))
+                conditional_config(self.entry_xmin.info_label,(False,"Il range di valori sull'asse X non contniene il Nucleo Cometa"))
+            if not self.limits_nucleus_y_ok:
+                conditional_config(self.entry_ymax.info_label,(False,"Il range di valori sull'asse Y non contniene il Nucleo Cometa"))
+                conditional_config(self.entry_ymin.info_label,(False,"Il range di valori sull'asse Y non contniene il Nucleo Cometa"))
 
-        main_inputs_valid = all_center_ok and all_limits_ok and min_max_ok
+        main_inputs_valid = all_center_ok and all_limits_ok and min_max_ok and self.limits_nucleus_ok
 
         self.validations.main_inputs_valid = main_inputs_valid
         if not main_inputs_valid:
@@ -630,7 +674,7 @@ class ImageProcessingGUI:
         
         
         if selected_option == OPTIONS[0]: # Division by Azimuthal Average
-            rho_pixels_ok = self._validate_rho_input_and_approximate(all_center_ok)
+            rho_pixels_ok = self._validate_rho_input_and_approximate(all_center_ok,all_limits_ok,self.limits_nucleus_ok)
             conditional_config(self.conditional_widgets_map["rho_pixels"]["info_label"],rho_pixels_ok)
             theta_pixels_ok = self._validate_int_input_and_approximate(self.theta_pixels_var, min_val=1)
             conditional_config(self.conditional_widgets_map["theta_pixels"]["info_label"],theta_pixels_ok)
@@ -646,7 +690,7 @@ class ImageProcessingGUI:
                 self.validations.std_dev_theta_ok = std_dev_theta_ok
 
         elif selected_option == OPTIONS[1]: # Azimuthal Median / Division by 1/rho profile
-            rho_pixels_ok = self._validate_rho_input_and_approximate(all_center_ok)
+            rho_pixels_ok = self._validate_rho_input_and_approximate(all_center_ok,all_limits_ok,self.limits_nucleus_ok)
             conditional_config(self.conditional_widgets_map["rho_pixels"]["info_label"],rho_pixels_ok)
             theta_pixels_ok = self._validate_int_input_and_approximate(self.theta_pixels_var, min_val=1)
             conditional_config(self.conditional_widgets_map["theta_pixels"]["info_label"],theta_pixels_ok)
@@ -662,7 +706,7 @@ class ImageProcessingGUI:
                 
             
         elif selected_option == OPTIONS[2]: # Azimuthal Renormalization
-            rho_pixels_ok = self._validate_rho_input_and_approximate(all_center_ok)
+            rho_pixels_ok = self._validate_rho_input_and_approximate(all_center_ok,all_limits_ok,self.limits_nucleus_ok)
             conditional_config(self.conditional_widgets_map["rho_pixels"]["info_label"],rho_pixels_ok)
             theta_pixels_ok = self._validate_int_input_and_approximate(self.theta_pixels_var, min_val=1)
             conditional_config(self.conditional_widgets_map["theta_pixels"]["info_label"],theta_pixels_ok)
@@ -724,6 +768,7 @@ class ImageProcessingGUI:
     def _data_warning(self):
         detail_string=""
         if not self.validations.main_inputs_valid:
+
             if not self.validations.all_center_ok:
                 if not self.validations.center_x_ok[0]:
                     detail_string = detail_string + "-Centro X "+self.validations.center_x_ok[1]+"\n"
@@ -746,6 +791,12 @@ class ImageProcessingGUI:
                         detail_string = detail_string + "-X Min >= X Max\n"
                     if not self.validations.y_min_max_ok:
                         detail_string = detail_string + "-Y Min >= Y Max\n"
+            if not self.limits_nucleus_ok:
+                detail_string = detail_string+"\n"
+                if not self.limits_nucleus_x_ok:
+                    detail_string = detail_string + "-il range di valori sull'asse X non contniene il Nucleo Cometa\n"
+                if not self.limits_nucleus_y_ok:
+                    detail_string = detail_string + "-il range di valori sull'asse Y non contniene il Nucleo Cometa\n"
         #TODO: VEDERE SE SI PUO OTTIMIZZARE IL CODICE ANCHE QUI
 
         if not self.validations.all_conditional_ok:
@@ -753,11 +804,13 @@ class ImageProcessingGUI:
             match self.validations.option:
                 case 0:
                     if not self.validations.rho_pixels_ok[0]:
-                        if not self.validations.all_center_ok:
+                        #TODO: riprodurre su tutto rho
+                        if (not self.validations.all_center_ok) or not(self.validations.all_limits_ok) or (not self.limits_nucleus_ok):
                             detail_string=detail_string + "-Limiti per numero di pixel asse ρ (rho) non calcolabili\n"
                         else:
                             detail_string = detail_string + "-Numero di pixel asse ρ (rho) "+self.validations.rho_pixels_ok[1]+", sarà impostato "+str(self.rho_default)+" che corrisponde alla più grande circonfernza contenuta nell'immagine a partire dal nucelo\n"
                             self.rho_pixels_var.set(str(self.rho_default))
+                    
                     if not self.validations.theta_pixels_ok[0]:
                         detail_string = detail_string + "-Numero di pixel asse θ "+self.validations.theta_pixels_ok[1]+"\n"
                     if not self.validations.std_dev_theta_ok[0]:
@@ -1144,4 +1197,5 @@ if __name__ == "__main__":
         print(f"Si è verificato un altro errore: {e}")
     
 
-#TODO: dati nucleo mancanti su rho al submit
+
+#TODO: rho deve essere limitato anche dal crop
