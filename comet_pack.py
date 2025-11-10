@@ -477,16 +477,12 @@ def inverserho_vectorized(imold: np.ndarray, xnuc: float, ynuc: float,outshapex:
 
 
 def radially_variable_spatial_filtering_vectorized(imold,A,B,N,NUMLOG,xnuc,ynuc,outshapex:int,outshapey:int):
-    # im_cropped = imold[ymin:ymax, xmin:xmax].copy()
-    # im_cropped = 100.0 * im_cropped / np.mean(im_cropped)
-    # xnuc_new = xnuc - xmin
-    # ynuc_new = ynuc - ymin
     
-    # #TODO: Warning
     if NUMLOG:
         if imold[imold<=1e-15].shape[0] ==0:
             imold=np.log10(imold)
         else:
+            print("Cannot convert into log scale. NUMLOG set to False")
             NUMLOG=False     #SERVE PER SCRIVERLO NEL FITS
     imn = np.zeros_like(imold)
     (numrows,numcols)=imold.shape
@@ -589,7 +585,7 @@ def radially_variable_spatial_filtering_vectorized(imold,A,B,N,NUMLOG,xnuc,ynuc,
     (imn_shape_y,imn_shape_x)=imn.shape
     out[0:imn_shape_y,0:imn_shape_x]=imn
 
-    return out
+    return out,NUMLOG
 
 
 

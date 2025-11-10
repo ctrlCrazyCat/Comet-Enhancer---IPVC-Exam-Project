@@ -19,7 +19,7 @@ import tkinter as tk
 matplotlib.use('TkAgg')
 
 from tooltip import Tooltip
-#TODO: SPOSTARE controllo logaritmo in preprocess comet pack
+
 
 class Params:
     def __init__(self):
@@ -68,7 +68,7 @@ class ImageProcessingGUI:
         self.image_path = None
         self.image_width = 0
         self.image_height = 0
-        self.log_abeled = True
+        
         
         # Aggiungi una variabile per tenere traccia se il submit è avvenuto con successo
         self.submitted_successfully = False
@@ -335,9 +335,7 @@ class ImageProcessingGUI:
                     self.image_width=hdul[0].header['NAXIS1']
                     self.image_height=hdul[0].header['NAXIS2']
                     self.imold[np.isnan(self.imold)] = np.min(self.imold[~np.isnan(self.imold)])
-                    if np.min(self.imold)<=0:
-                        self.transform_log_var.set(False)
-                        self.log_abeled = False
+
                     
                 self.image_info_label.config(text=f"Immagine: {self.image_path.split('/')[-1]} ({self.image_width}x{self.image_height})")
                 
@@ -416,8 +414,7 @@ class ImageProcessingGUI:
                 widget.grid(row=row_num, column=2, padx=5, pady=5, sticky="ew")
                 widget.config(state=tk.NORMAL)
                 guide.grid(row=row_num,column=3,padx=5,pady=5,sticky="ew")
-            if self.log_abeled==False:
-                self.conditional_widgets_map["transform_log"]["widget"].config(state=tk.DISABLED)
+            
         else:
             # Caso fallback (es. opzione non in config, ma non è op[3])
             # o se l'opzione [3] non fosse gestita esplicitamente sopra

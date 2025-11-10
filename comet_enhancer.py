@@ -73,8 +73,14 @@ if __name__ == "__main__":
                     print(f"  Kernel A Term: {float(app.kernel_a_term_var.get())}")
                     print(f"  Kernel B Term: {float(app.kernel_b_term_var.get())}")
                     print(f"  Kernel N Term: {float(app.kernel_n_term_var.get())}")
+                    
+                    if o.NUMLOG == True:
+                        #if imold_preprocessed[imold_preprocessed<=1e-15].shape[0]==0:
+                        o.NUMLOG = False
+                        app.transform_log_var.set(False)
+                        messagebox.showwarning("Attenzione","L'immagine da elaborare contiene dei valori minori o molto vicini a 0.\nLa conversione in scala logaritmica non è possibile, l'elaborazione continuerà senza la trasformazione.")
                     print(f"  Transform Log: {app.transform_log_var.get()}")
-                    o.imn = comet_pack.radially_variable_spatial_filtering_vectorized(imold_preprocessed,o.A,o.B,o.N,o.NUMLOG,xnuc_rel,ynuc_rel,o.NCOL,o.NROW)
+                    (o.imn,o.NUMLOG) = comet_pack.radially_variable_spatial_filtering_vectorized(imold_preprocessed,o.A,o.B,o.N,o.NUMLOG,xnuc_rel,ynuc_rel,o.NCOL,o.NROW)
                 app.submit_button.config(state=tk.DISABLED,cursor="arrow")
 
                 interactive_image_viewer(o)
