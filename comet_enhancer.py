@@ -34,7 +34,7 @@ if __name__ == "__main__":
                 o=app.params_process(selected_option)
                 
                 (imold_preprocessed, xnuc_rel, ynuc_rel) = comet_pack.preprocess_normalize_and_crop(app.imold,o.xnuc,o.ynuc,o.x_lower_lim,o.x_upper_lim,o.y_lower_lim,o.y_upper_lim)
-                
+                print(imold_preprocessed.shape)
                 if selected_option == OPTIONS[0]:
                     print(f"  Rho Pixels: {int(app.rho_pixels_var.get())}")
                     print(f"  Theta Pixels: {int(app.theta_pixels_var.get())}")
@@ -75,10 +75,10 @@ if __name__ == "__main__":
                     print(f"  Kernel N Term: {float(app.kernel_n_term_var.get())}")
                     
                     if o.NUMLOG == True:
-                        #if imold_preprocessed[imold_preprocessed<=1e-15].shape[0]==0:
-                        o.NUMLOG = False
-                        app.transform_log_var.set(False)
-                        messagebox.showwarning("Attenzione","L'immagine da elaborare contiene dei valori minori o molto vicini a 0.\nLa conversione in scala logaritmica non è possibile, l'elaborazione continuerà senza la trasformazione.")
+                        if not (imold_preprocessed[imold_preprocessed<=1e-15].shape[0]==0):
+                            o.NUMLOG = False
+                            app.transform_log_var.set(False)
+                            messagebox.showwarning("Attenzione","L'immagine da elaborare contiene dei valori minori o molto vicini a 0.\nLa conversione in scala logaritmica non è possibile, l'elaborazione continuerà senza la trasformazione.")
                     print(f"  Transform Log: {app.transform_log_var.get()}")
                     (o.imn,o.NUMLOG) = comet_pack.radially_variable_spatial_filtering_vectorized(imold_preprocessed,o.A,o.B,o.N,o.NUMLOG,xnuc_rel,ynuc_rel,o.NCOL,o.NROW)
                 app.submit_button.config(state=tk.DISABLED,cursor="arrow")

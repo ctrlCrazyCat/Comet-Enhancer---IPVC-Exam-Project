@@ -174,16 +174,6 @@ def polarize(imold,nrad,ntheta,xnuc:float,ynuc:float):
 
 
 
-def azimuthal_median_division_vectorized(imiun):
-    (nrad,ntheta)=imiun.shape
-    jjj_all = np.sum(imiun < 0.0, axis=1)
-    sorted_bvect_all = np.sort(imiun, axis=1)
-    nmid_fortran_style_all = ((ntheta + jjj_all) // 2).astype(int)
-    median_idx_all = np.maximum(0, nmid_fortran_style_all - 1)
-
-    median_all = sorted_bvect_all[np.arange(nrad), median_idx_all]
-    imien = imiun / (median_all[:, np.newaxis] + 1.0e-6)
-    return imien
 
 
 def azimuthal_average_division_vectorized(imiun,rejsig):
@@ -208,6 +198,19 @@ def azimuthal_average_division_vectorized(imiun,rejsig):
     sum_pass2 = np.sum(imiun * mask_pass2, axis=1)
     mean_final = np.where(kk_all > 0, sum_pass2 / kk_all, 0.0)
     imien=imiun / (mean_final[:, np.newaxis] + 1.0e-6)
+    return imien
+
+
+
+def azimuthal_median_division_vectorized(imiun):
+    (nrad,ntheta)=imiun.shape
+    jjj_all = np.sum(imiun < 0.0, axis=1)
+    sorted_bvect_all = np.sort(imiun, axis=1)
+    nmid_fortran_style_all = ((ntheta + jjj_all) // 2).astype(int)
+    median_idx_all = np.maximum(0, nmid_fortran_style_all - 1)
+
+    median_all = sorted_bvect_all[np.arange(nrad), median_idx_all]
+    imien = imiun / (median_all[:, np.newaxis] + 1.0e-6)
     return imien
 
 
