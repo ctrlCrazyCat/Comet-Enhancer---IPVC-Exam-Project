@@ -1,71 +1,65 @@
-import os
+
 import numpy as np
-import cv2
-from astropy.io import fits
 import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.widgets import RangeSlider,Button
-from matplotlib.cm import get_cmap
-import tkinter as tk
-from tkinter import filedialog as fd,messagebox
+
 
 TWOPI = 2*np.pi
 
-class Params:
-    def __init__(self):
-        return
 
-OPTIONS = [
-            'Division by Azimuthal Average',
-            'Division by Azimuthal Median',
-            'Azimuthal Renormalization',
-            'Division by 1/rho profile',
-            'Radially Variable Spatial Filtering'
-        ]
-def get_options():
-    return OPTIONS
-    
-def get_input_data(filepath):
-    hdul = fits.open(filepath)
-    hdu=hdul[0]
-    imold = hdu.data
-    imold[np.isnan(imold)] = np.min(imold[~np.isnan(imold)])
-    imold=imold.astype(float)
-    imold = 100*imold/np.mean(imold)
-    log_abeled = True
-    if np.min(imold)<=0:
-        log_abeled=False
-    print("LLAAA")
-    
-    return hdul,imold,log_abeled
-
-def inverserho_vectorized(imold: np.ndarray, xnuc: float, ynuc: float,xmin:int,xmax:int,ymin:int,ymax:int) -> np.ndarray:
+def preprocess_and_normalize_crop(imold: np.ndarray, xnuc: float, ynuc: float, 
+                                  xmin: int, xmax: int, ymin: int, ymax: int) -> tuple:
     """
-    Esegue il miglioramento "inverserho" (moltiplicazione per rho) su un'immagine.
-    
-    Questa funzione replica la logica del programma Fortran 'cometcief_inverserho':
-    1. Rinormalizza l'immagine di input per avere una media di 100.0.
-    2. Calcola la distanza media 'rho' da un ottocentro (xnuc, ynuc)
-       per ogni pixel, utilizzando una media di 10x10 sotto-punti pixel.
-    3. Moltiplica l'immagine rinormalizzata per la mappa di 'rho' media.
+    Ritaglia l'immagine, normalizza il ritaglio e ricalcola le coordinate del nucleo.
+
+    Questa funzione replica fedelmente i passaggi preliminari dei programmi FORTRAN:
+    1. Estrae la sottomatrice (il ritaglio) dall'immagine originale.
+    2. Normalizza SOLO il ritaglio per avere una media di 100.0.
+    3. Ricalcola le coordinate xnuc/ynuc per essere relative al nuovo array ritagliato.
 
     Args:
-        imold (np.ndarray): L'immagine di input 2D come array NumPy.
-        xnuc (float): La coordinata X (colonna) 0-based dell'ottocentro.
-        ynuc (float): La coordinata Y (riga) 0-based dell'ottocentro.
+        imold (np.ndarray): L'immagine COMPLETA originale.
+        xnuc (float): Coordinata X (colonna) 0-indexed del nucleo (relativa a imold).
+        ynuc (float): Coordinata Y (riga) 0-indexed del nucleo (relativa a imold).
+        xmin (int): Indice X (colonna) 0-indexed INIZIALE per lo slice.
+        xmax (int): Indice X (colonna) 0-indexed FINALE per lo slice (non incluso).
+        ymin (int): Indice Y (riga) 0-indexed INIZIALE per lo slice.
+        ymax (int): Indice Y (riga) 0-indexed FINALE per lo slice (non incluso).
 
     Returns:
-        np.ndarray: L'immagine migliorata 'imnew'.
+        tuple:
+            - np.ndarray: L'array dell'immagine RITAGLIATA e NORMALIZZATA (`im_processed`).
+            - float: La nuova coordinata X relativa (`xnuc_rel`).
+            - float: La nuova coordinata Y relativa (`ynuc_rel`).
     """
     
-    # 0. Ottieni le dimensioni dell'immagine
-    (NROW, NCOL) = imold.shape
+    # --- 1. Ritaglia l'immagine (come 'imgs2r') ---
+    # Lo slicing Python [start:end] usa 'end' come non incluso, 
+    # che corrisponde a come la GUI passa xmax/ymax.
+    im_cropped = imold[ymin:ymax, xmin:xmax].copy()
 
-    # -----------------------------------------------------------------
-    # FASE 1: Rinormalizzazione (come nei loop Fortran 100-101)
-    # -----------------------------------------------------------------
+    print("CROPPED SIZE ",im_cropped.shape)
+
+    # --- 2. Normalizza il ritaglio (come i loop 100-101) ---
+    mean_crop = np.mean(im_cropped)
     
-    # Calcola la media dell'intera immagine
+    if mean_crop != 0:
+        # Questa è la logica FORTRAN: renorm=100.0/avepix ... aarray(i)=aarray(i)*renorm
+        im_processed = (im_cropped / mean_crop) * 100.0
+    else:
+        # Se la media è 0 (immagine nera), l'array rimane di zeri
+        im_processed = im_cropped 
+
+    # --- 3. Ricalcola le coordinate (come 'xnuc=xnuc-float(xint)+1.0') ---
+    # Dato che usiamo 0-based, la formula è una semplice sottrazione.
+    # Esempio: xnuc=50.5 (assoluto) e xmin=10. Il nuovo xnuc_rel sarà 40.5
+    xnuc_rel = xnuc - xmin
+    ynuc_rel = ynuc - ymin
+    print(xnuc_rel,ynuc_rel,"REAL NUX")
+    return im_processed, xnuc_rel, ynuc_rel
+    
+def polarize(imold,nrad,ntheta,xnuc:float,ynuc:float):
+    #imold = imold*100/np.mean(imold)
+
     avepix = np.mean(imold)
     
     # Gestione di un'immagine completamente nera per evitare la divisione per zero
@@ -79,59 +73,104 @@ def inverserho_vectorized(imold: np.ndarray, xnuc: float, ynuc: float,xmin:int,x
     # Applica la rinormalizzazione
     aarray_renorm = imold * renorm
 
-    # -----------------------------------------------------------------
-    # FASE 2: Moltiplicazione per Rho (come nei loop Fortran 202-220)
-    # -----------------------------------------------------------------
+    (NROW,NCOL) = imold.shape
+    print("row",NROW,"col",NCOL)
+    mtheta=ntheta*10
+    fmthet=float(mtheta)
+    angle = (np.arange(mtheta + 1, dtype=float) - 0.5) * (TWOPI / fmthet)
+    angcos=-np.sin(angle)
+    angsin=np.cos(angle)
+    imiun = np.zeros((nrad, ntheta))
 
-    # 2a. Crea griglie di coordinate per i CENTRI di ogni pixel
-    # y_coords va da 0 a NROW-1
-    # x_coords va da 0 a NCOL-1
-    y_coords, x_coords = np.indices((NROW, NCOL))
+    linspace_vec1 = 0.1 * np.linspace(1, 10, 10) # Array di 10 elementi: [0.1, 0.2, ..., 1.0]
+    linspace_vec2 = np.arange(9) # Array di 9 elementi: [0, 1, ..., 8]
 
-    # 2b. Calcola la distanza dal nucleo al CENTRO di ogni pixel
-    # Questo corrisponde a 'x = xnuc - float(jx)' e 'y = ynuc - float(iy)'
-    x_dist_centers = xnuc - x_coords
-    y_dist_centers = ynuc - y_coords
+    # Vettorizzazione completa
+    # Creazione di indici per i e j per broadcasting
+    i_coords = np.arange(nrad).reshape(-1, 1) # (nrad, 1) per broadcasting con linspace_vec1
+    j_coords_base = np.arange(ntheta).reshape(1, -1) # (1, ntheta) per broadcasting con linspace_vec2
 
-    # 2c. Definisci il vettore di offset sub-pixel 10x10
-    # Fortran: -0.55 + (0.1 * float(ii)) con ii da 1 a 10
-    # Questo genera: [-0.45, -0.35, ..., +0.35, +0.45]
-    sub_offsets = np.linspace(-0.45, 0.45, 10)
+    # Calcolo di ai_v per tutte le 'i' e linspace_vec1
+    # Forma desiderata: (nrad, 10)
+    ai_v_all = (i_coords - 0.55 + linspace_vec1) # (nrad, 10)
 
-    # 2d. Calcola rho per tutti i 100 sotto-punti di OGNI pixel
-    # Usiamo il broadcasting di NumPy per evitare loop
+    # Calcolo di jnew_v per tutte le 'j' e linspace_vec2
+    # Forma desiderata: (ntheta, 9)
+    jnew_v_all_base = (j_coords_base.T * 10 + linspace_vec2) # .T per (ntheta, 1) * (9,) -> (ntheta, 9)
+
+    # Clipa gli indici per evitare errori se jnew_v_all va fuori range di angcos/angsin
+    jnew_v_clipped = np.clip(jnew_v_all_base, 0, len(angcos) - 1).astype(int)
+
+    # Estendere angcos e angsin per tutti i jnew_v
+    # Forma desiderata: (ntheta, 9)
+    angcos_vals = angcos[jnew_v_clipped]
+    angsin_vals = angsin[jnew_v_clipped]
+
+
+    # --- Ora, prepariamo per la moltiplicazione "outer" vettorizzata ---
+    # Per la moltiplicazione (ai_v * angcos_vals), vogliamo ottenere una forma (nrad, ntheta, 10, 9)
+    # ai_v_all ha forma (nrad, 10)
+    # angcos_vals ha forma (ntheta, 9)
+
+    # Espandiamo ai_v_all per essere (nrad, 1, 10, 1)
+    ai_v_expanded = ai_v_all[:, np.newaxis, :, np.newaxis] # (nrad, 1, 10, 1)
+
+    # Espandiamo angcos_vals per essere (1, ntheta, 1, 9)
+    angcos_expanded_for_mul = angcos_vals[np.newaxis, :, np.newaxis, :] # (1, ntheta, 1, 9)
+    angsin_expanded_for_mul = angsin_vals[np.newaxis, :, np.newaxis, :] # (1, ntheta, 1, 9)
+
+    # Calcolo vettorizzato di xpix_v e ypix_v
+    # Il risultato sarà (nrad, ntheta, 10, 9)
+    xpix_vals_unrounded = xnuc + (ai_v_expanded * angcos_expanded_for_mul)
+    ypix_vals_unrounded = ynuc + (ai_v_expanded * angsin_expanded_for_mul)
+
+    # Arrotondamento e conversione a int32
+    xpix_all = np.round(xpix_vals_unrounded).astype(np.int32)
+    ypix_all = np.round(ypix_vals_unrounded).astype(np.int32)
+
+    # --- Gestione delle condizioni di "out of bounds" in modo vettorizzato ---
+    # Crea una maschera per i valori validi (in-bounds)
+    valid_coords_mask = (xpix_all >= 0) & (xpix_all < NCOL) & \
+                        (ypix_all >= 0) & (ypix_all < NROW)
+
+    # Vogliamo sapere per ogni (i, j) se TUTTI i 90 sotto-punti sono validi.
+    all_subpoints_valid_per_ij = np.all(valid_coords_mask, axis=(-2, -1))
+
+    # Inizializza un array per i risultati di `aarray[ypix_v, xpix_v]`
+    aarray_values = np.zeros(xpix_all.shape, dtype=imold.dtype)
+
+    # Usa advanced indexing per riempire aarray_values solo dove valid_coords_mask è True
+    flat_valid_coords_mask = valid_coords_mask.flatten()
+    flat_xpix_all = xpix_all.flatten()
+    flat_ypix_all = ypix_all.flatten()
+
+    valid_flat_xpix = flat_xpix_all[flat_valid_coords_mask]
+    valid_flat_ypix = flat_ypix_all[flat_valid_coords_mask]
+
+    values_from_aarray = aarray_renorm[valid_flat_ypix, valid_flat_xpix]
+
+    temp_flat_aarray_values = np.zeros(xpix_all.size, dtype=imold.dtype)
+    temp_flat_aarray_values[flat_valid_coords_mask] = values_from_aarray
+    aarray_values_reshaped = temp_flat_aarray_values.reshape(xpix_all.shape)
+
+    # Somma i valori di aarray_values_reshaped per ottenere il risultato per ogni (i, j)
+    sum_of_aarray_for_ij = np.sum(aarray_values_reshaped, axis=(-2, -1))
+
+    # Applica il moltiplicatore 0.01
+    calculated_avect_values = 0.01 * sum_of_aarray_for_ij
+
+    # Inizialmente tutti i valori calcolati
+    imiun = calculated_avect_values
     
-    # Espandi le distanze dei centri e gli offset
-    # x_dist_centers (NROW, NCOL) -> (NROW, NCOL, 1)
-    # y_dist_centers (NROW, NCOL) -> (NROW, NCOL, 1)
-    # sub_offsets (10,)
-    
-    # x_sub_grid avrà forma (NROW, NCOL, 10, 1)
-    # y_sub_grid avrà forma (NROW, NCOL, 1, 10)
-    x_sub_grid = x_dist_centers[..., np.newaxis, np.newaxis] + sub_offsets[np.newaxis, :]
-    y_sub_grid = y_dist_centers[..., np.newaxis, np.newaxis] + sub_offsets[:, np.newaxis]
+    # Se almeno un sotto-punto non è valido, imposta l'intero blocco (i, j) a -1.0
+    imiun[~all_subpoints_valid_per_ij] = -1.0
 
-    # Tramite broadcasting, x_sub_grid e y_sub_grid creano una
-    # griglia 10x10 di coordinate (xnew, ynew) per ogni pixel (NROW, NCOL)
-    
-    # Calcola rho per tutti i 100 sotto-punti.
-    # rho_sub_pixels avrà forma (NROW, NCOL, 10, 10)
-    rho_sub_pixels = np.sqrt(x_sub_grid**2 + y_sub_grid**2)
+    # Gestione della condizione avect[j] < 1e-5
+    small_value_mask = (imiun < 1e-5) & (imiun != -1.0)
+    imiun[small_value_mask] = -1
+    return imiun
 
-    # 2e. Calcola il rho MEDIO per ogni pixel
-    # (corrisponde a 'rho = rho * 0.01' dopo la somma)
-    # rho_mean avrà forma (NROW, NCOL)
-    rho_mean = np.mean(rho_sub_pixels, axis=(-2, -1))
 
-    # -----------------------------------------------------------------
-    # FASE 3: Applica il Miglioramento
-    # -----------------------------------------------------------------
-    
-    # Moltiplica l'immagine rinormalizzata per la mappa del rho medio
-    imn= aarray_renorm * rho_mean
-    print("IMN SHAPE",imn.shape)
-    print("LIMITI: ",ymin,ymax,xmin,xmax)
-    return imn[ymin:ymax,xmin:xmax]
 
 
 
@@ -149,6 +188,7 @@ def azimuthal_median_division_vectorized(imiun):
 
 def azimuthal_average_division_vectorized(imiun,rejsig):
     mask_pass1 = (imiun >= 0.0)
+    
     jj_all = np.sum(mask_pass1, axis=1)
     sum_pass1 = np.sum(imiun * mask_pass1, axis=1)
     mean_pass1 = np.where(jj_all > 0, sum_pass1 / jj_all, 0.0)
@@ -242,7 +282,7 @@ def azimuthal_renormalization_vectorized(imiun,rejsig,nsig):
 
 
 
-def reconstruct_from_polar(imien,NCOL:int,NROW:int,xnuc:float,ynuc:float,xmin:int,xmax:int,ymin:int,ymax:int):
+def reconstruct_from_polar(imien,NCOL:int,NROW:int,xnuc:float,ynuc:float):
     
     (nrad,ntheta)=imien.shape
 
@@ -330,120 +370,128 @@ def reconstruct_from_polar(imien,NCOL:int,NROW:int,xnuc:float,ynuc:float,xmin:in
     # Assegnazione finale a imn
     # cvect_sum_all ha la forma (lcol, lrow), che è esattamente quella che vogliamo per imn
     imn = cvect_sum_all * 0.01
-    return imn[ymin:ymax,xmin:xmax]
+    return imn
 
 
 
 
-def polarize(imold,nrad,ntheta,xnuc:float,ynuc:float):
-    (NROW,NCOL) = imold.shape
-    print("row",NROW,"col",NCOL)
-    mtheta=ntheta*10
-    fmthet=float(mtheta)
-    angle = (np.arange(mtheta + 1, dtype=float) - 0.5) * (TWOPI / fmthet)
-    angcos=-np.sin(angle)
-    angsin=np.cos(angle)
-    imiun = np.zeros((nrad, ntheta))
-
-    linspace_vec1 = 0.1 * np.linspace(1, 10, 10) # Array di 10 elementi: [0.1, 0.2, ..., 1.0]
-    linspace_vec2 = np.arange(9) # Array di 9 elementi: [0, 1, ..., 8]
-
-    # Vettorizzazione completa
-    # Creazione di indici per i e j per broadcasting
-    i_coords = np.arange(nrad).reshape(-1, 1) # (nrad, 1) per broadcasting con linspace_vec1
-    j_coords_base = np.arange(ntheta).reshape(1, -1) # (1, ntheta) per broadcasting con linspace_vec2
-
-    # Calcolo di ai_v per tutte le 'i' e linspace_vec1
-    # Forma desiderata: (nrad, 10)
-    ai_v_all = (i_coords - 0.55 + linspace_vec1) # (nrad, 10)
-
-    # Calcolo di jnew_v per tutte le 'j' e linspace_vec2
-    # Forma desiderata: (ntheta, 9)
-    jnew_v_all_base = (j_coords_base.T * 10 + linspace_vec2) # .T per (ntheta, 1) * (9,) -> (ntheta, 9)
-
-    # Clipa gli indici per evitare errori se jnew_v_all va fuori range di angcos/angsin
-    jnew_v_clipped = np.clip(jnew_v_all_base, 0, len(angcos) - 1).astype(int)
-
-    # Estendere angcos e angsin per tutti i jnew_v
-    # Forma desiderata: (ntheta, 9)
-    angcos_vals = angcos[jnew_v_clipped]
-    angsin_vals = angsin[jnew_v_clipped]
-
-
-    # --- Ora, prepariamo per la moltiplicazione "outer" vettorizzata ---
-    # Per la moltiplicazione (ai_v * angcos_vals), vogliamo ottenere una forma (nrad, ntheta, 10, 9)
-    # ai_v_all ha forma (nrad, 10)
-    # angcos_vals ha forma (ntheta, 9)
-
-    # Espandiamo ai_v_all per essere (nrad, 1, 10, 1)
-    ai_v_expanded = ai_v_all[:, np.newaxis, :, np.newaxis] # (nrad, 1, 10, 1)
-
-    # Espandiamo angcos_vals per essere (1, ntheta, 1, 9)
-    angcos_expanded_for_mul = angcos_vals[np.newaxis, :, np.newaxis, :] # (1, ntheta, 1, 9)
-    angsin_expanded_for_mul = angsin_vals[np.newaxis, :, np.newaxis, :] # (1, ntheta, 1, 9)
-
-    # Calcolo vettorizzato di xpix_v e ypix_v
-    # Il risultato sarà (nrad, ntheta, 10, 9)
-    xpix_vals_unrounded = xnuc + (ai_v_expanded * angcos_expanded_for_mul)
-    ypix_vals_unrounded = ynuc + (ai_v_expanded * angsin_expanded_for_mul)
-
-    # Arrotondamento e conversione a int32
-    xpix_all = np.round(xpix_vals_unrounded).astype(np.int32)
-    ypix_all = np.round(ypix_vals_unrounded).astype(np.int32)
-
-    # --- Gestione delle condizioni di "out of bounds" in modo vettorizzato ---
-    # Crea una maschera per i valori validi (in-bounds)
-    valid_coords_mask = (xpix_all >= 0) & (xpix_all < NCOL) & \
-                        (ypix_all >= 0) & (ypix_all < NROW)
-
-    # Vogliamo sapere per ogni (i, j) se TUTTI i 90 sotto-punti sono validi.
-    all_subpoints_valid_per_ij = np.all(valid_coords_mask, axis=(-2, -1))
-
-    # Inizializza un array per i risultati di `aarray[ypix_v, xpix_v]`
-    aarray_values = np.zeros(xpix_all.shape, dtype=imold.dtype)
-
-    # Usa advanced indexing per riempire aarray_values solo dove valid_coords_mask è True
-    flat_valid_coords_mask = valid_coords_mask.flatten()
-    flat_xpix_all = xpix_all.flatten()
-    flat_ypix_all = ypix_all.flatten()
-
-    valid_flat_xpix = flat_xpix_all[flat_valid_coords_mask]
-    valid_flat_ypix = flat_ypix_all[flat_valid_coords_mask]
-
-    values_from_aarray = imold[valid_flat_ypix, valid_flat_xpix]
-
-    temp_flat_aarray_values = np.zeros(xpix_all.size, dtype=imold.dtype)
-    temp_flat_aarray_values[flat_valid_coords_mask] = values_from_aarray
-    aarray_values_reshaped = temp_flat_aarray_values.reshape(xpix_all.shape)
-
-    # Somma i valori di aarray_values_reshaped per ottenere il risultato per ogni (i, j)
-    sum_of_aarray_for_ij = np.sum(aarray_values_reshaped, axis=(-2, -1))
-
-    # Applica il moltiplicatore 0.01
-    calculated_avect_values = 0.01 * sum_of_aarray_for_ij
-
-    # Inizialmente tutti i valori calcolati
-    imiun = calculated_avect_values
+def inverserho_vectorized(imold: np.ndarray, xnuc: float, ynuc: float,outshapex:int,outshapey:int) -> np.ndarray:
+    """
+    Esegue il miglioramento "inverserho" (moltiplicazione per rho) su un'immagine.
     
-    # Se almeno un sotto-punto non è valido, imposta l'intero blocco (i, j) a -1.0
-    imiun[~all_subpoints_valid_per_ij] = -1.0
+    Questa funzione replica la logica del programma Fortran 'cometcief_inverserho':
+    1. Rinormalizza l'immagine di input per avere una media di 100.0.
+    2. Calcola la distanza media 'rho' da un ottocentro (xnuc, ynuc)
+       per ogni pixel, utilizzando una media di 10x10 sotto-punti pixel.
+    3. Moltiplica l'immagine rinormalizzata per la mappa di 'rho' media.
 
-    # Gestione della condizione avect[j] < 1e-5
-    small_value_mask = (imiun < 1e-5) & (imiun != -1.0)
-    imiun[small_value_mask] = -1
-    return imiun
+    Args:
+        imold (np.ndarray): L'immagine di input 2D come array NumPy.
+        xnuc (float): La coordinata X (colonna) 0-based dell'ottocentro.
+        ynuc (float): La coordinata Y (riga) 0-based dell'ottocentro.
+
+    Returns:
+        np.ndarray: L'immagine migliorata 'imnew'.
+    """
+    
+    # 0. Ottieni le dimensioni dell'immagine
+    #(NROW, NCOL) = imold.shape
+
+    # -----------------------------------------------------------------
+    # FASE 1: Rinormalizzazione (come nei loop Fortran 100-101)
+    # -----------------------------------------------------------------
+    
+    # Calcola la media dell'intera immagine
+    #avepix = np.mean(imold)
+    
+    # Gestione di un'immagine completamente nera per evitare la divisione per zero
+    # if avepix == 0:
+    #     # Se l'immagine è vuota, il risultato è vuoto
+    #     return np.zeros_like(imold)
+        
+    # # Calcola il fattore di rinormalizzazione per portare la media a 100.0
+    # renorm = 100.0 / avepix
+    
+    # Applica la rinormalizzazione
+    #aarray_renorm = imold * renorm
+
+    # -----------------------------------------------------------------
+    # FASE 2: Moltiplicazione per Rho (come nei loop Fortran 202-220)
+    # -----------------------------------------------------------------
+
+    # 2a. Crea griglie di coordinate per i CENTRI di ogni pixel
+    # y_coords va da 0 a NROW-1
+    # x_coords va da 0 a NCOL-1
+   
+    (y_coords, x_coords) = np.indices(imold.shape)
+    
+    # 2b. Calcola la distanza dal nucleo al CENTRO di ogni pixel
+    # Questo corrisponde a 'x = xnuc - float(jx)' e 'y = ynuc - float(iy)'
+    x_dist_centers = xnuc - x_coords
+    y_dist_centers = ynuc - y_coords
+
+    # 2c. Definisci il vettore di offset sub-pixel 10x10
+    # Fortran: -0.55 + (0.1 * float(ii)) con ii da 1 a 10
+    # Questo genera: [-0.45, -0.35, ..., +0.35, +0.45]
+    sub_offsets = np.linspace(-0.45, 0.45, 10)
+
+    # 2d. Calcola rho per tutti i 100 sotto-punti di OGNI pixel
+    # Usiamo il broadcasting di NumPy per evitare loop
+    
+    # Espandi le distanze dei centri e gli offset
+    # x_dist_centers (NROW, NCOL) -> (NROW, NCOL, 1)
+    # y_dist_centers (NROW, NCOL) -> (NROW, NCOL, 1)
+    # sub_offsets (10,)
+    
+    # x_sub_grid avrà forma (NROW, NCOL, 10, 1)
+    # y_sub_grid avrà forma (NROW, NCOL, 1, 10)
+    print("QUIAADSAD")
+    x_sub_grid = x_dist_centers[..., np.newaxis, np.newaxis] + sub_offsets[np.newaxis, :]
+    y_sub_grid = y_dist_centers[..., np.newaxis, np.newaxis] + sub_offsets[:, np.newaxis]
+    print("QUIAADSAD2")
+    # Tramite broadcasting, x_sub_grid e y_sub_grid creano una
+    # griglia 10x10 di coordinate (xnew, ynew) per ogni pixel (NROW, NCOL)
+    
+    # Calcola rho per tutti i 100 sotto-punti.
+    # rho_sub_pixels avrà forma (NROW, NCOL, 10, 10)
+    rho_sub_pixels = np.sqrt(x_sub_grid**2 + y_sub_grid**2)
+
+    # 2e. Calcola il rho MEDIO per ogni pixel
+    # (corrisponde a 'rho = rho * 0.01' dopo la somma)
+    # rho_mean avrà forma (NROW, NCOL)
+    rho_mean = np.mean(rho_sub_pixels, axis=(-2, -1))
+
+    # -----------------------------------------------------------------
+    # FASE 3: Applica il Miglioramento
+    # -----------------------------------------------------------------
+    
+    # Moltiplica l'immagine rinormalizzata per la mappa del rho medio
+    
+    imn= imold * rho_mean
+    out=np.zeros((outshapey,outshapex))
+    (imn_shape_y,imn_shape_x)=imn.shape
+    out[0:imn_shape_y,0:imn_shape_x]=imn
+    print("IMN SHAPE",imn.shape)
+    print("OUT SHAPE",out.shape)
+    return out
+
+
 
 def radially_variable_spatial_filtering_vectorized(imold,A,B,N,NUMLOG,xnuc,ynuc,xmin,xmax,ymin,ymax):
-    imavg=np.mean(imold)
-    imold=imold*100.0/imavg
-    (numrows,numcols)=imold.shape
+    im_cropped = imold[ymin:ymax, xmin:xmax].copy()
+    im_cropped = 100.0 * im_cropped / np.mean(im_cropped)
+    xnuc_new = xnuc - xmin
+    ynuc_new = ynuc - ymin
+    
     #TODO: Warning
     if NUMLOG:
-        if imold[imold<=1e-15].shape[0] ==0:
-            imold=np.log10(imold)
+        if im_cropped[im_cropped<=1e-15].shape[0] ==0:
+            im_cropped=np.log10(im_cropped)
         else:
             NUMLOG=False     #SERVE PER SCRIVERLO NEL FITS
-    imn = np.zeros_like(imold)
+    imn = np.zeros_like(im_cropped)
+    (numrows,numcols)=im_cropped.shape
+    
 
     # Pre-calcolo delle coordinate sub-pixel m e n
     m_coords = -5.5e-1 + (np.arange(10) + 1) * 1.0e-1
@@ -460,6 +508,7 @@ def radially_variable_spatial_filtering_vectorized(imold,A,B,N,NUMLOG,xnuc,ynuc,
     # Offsets per i corner pixels: (+/-1, +/-1)
     mult_i_crn = np.array([-1, -1, 1, 1])
     mult_j_crn = np.array([-1, 1, -1, 1])
+    
     for i in range(numrows):
         
         # Calcolo di a0 vettorizzato per la riga 'i' corrente
@@ -471,7 +520,7 @@ def radially_variable_spatial_filtering_vectorized(imold,A,B,N,NUMLOG,xnuc,ynuc,
         an_expanded = an_grid_subpixel[np.newaxis, np.newaxis, :, :] # (1, 1, 10, 10)
 
         # rho avrà forma (1, xlim, 10, 10)
-        rho = np.sqrt(np.square(J_coords - xnuc + am_expanded) + np.square(float(i) - ynuc + an_expanded))
+        rho = np.sqrt(np.square(J_coords - xnuc_new + am_expanded) + np.square(float(i) - ynuc_new + an_expanded))
         a0 = A + (B * (np.power(rho, N))) # a0 ha forma (1, xlim, 10, 10)
         
         # Arrotonda e appiattisci a0 per gli offset
@@ -502,9 +551,9 @@ def radially_variable_spatial_filtering_vectorized(imold,A,B,N,NUMLOG,xnuc,ynuc,
                             (jjj_edge >= 0) & (jjj_edge < numcols) & \
                             (((all_delta_i_edge == 0) & (all_delta_j_edge != 0)) | \
                             ((all_delta_j_edge == 0) & (all_delta_i_edge != 0)))
-
-        valid_imold_values_edge = imold[iii_edge[valid_mask_edge], jjj_edge[valid_mask_edge]]
-        
+        print("ADASD",im_cropped.shape)
+        valid_imold_values_edge = im_cropped[iii_edge[valid_mask_edge], jjj_edge[valid_mask_edge]]
+        print("QUIIIIIIASD")
         # Mappa i contributi ai pixel (i,j) originali nella riga corrente
         target_j_flat_edge = j_base_flat_repeated[valid_mask_edge]
         
@@ -528,7 +577,7 @@ def radially_variable_spatial_filtering_vectorized(imold,A,B,N,NUMLOG,xnuc,ynuc,
                             (jjj_crn >= 0) & (jjj_crn < numcols) & \
                             (all_delta_i_crn != 0) & (all_delta_j_crn != 0)
 
-        valid_imold_values_crn = imold[iii_crn[valid_mask_crn], jjj_crn[valid_mask_crn]]
+        valid_imold_values_crn = im_cropped[iii_crn[valid_mask_crn], jjj_crn[valid_mask_crn]]
         
         target_j_flat_crn = j_base_flat_repeated[valid_mask_crn]
 
@@ -536,244 +585,14 @@ def radially_variable_spatial_filtering_vectorized(imold,A,B,N,NUMLOG,xnuc,ynuc,
         total_sumcrn_row = summed_contributions_crn * 1.0e-2
 
         # Calcolo finale di imn per la riga 'i' corrente
-        imn[i, :] = 1024.0 * imold[i, :] - 192.0 * total_sumedg_row - 64.0 * total_sumcrn_row
-    return imn[ymin:ymax-1,xmin:xmax-1]
-
-
-
-
-
-
-def interactive_image_viewer(p:Params, gamma_step=0.05):
-    """
-    Mostra un'immagine astronomica in modo interattivo con controlli per lo stretching 
-    dei livelli (RangeSlider verticale) e la correzione Gamma (scroll del mouse).
-
-    Args:
-        image_data (np.ndarray): Array NumPy (2D) contenente i dati dell'immagine.
-        gamma_step (float): Il passo di incremento/decremento della correzione Gamma.
-    """
-    
-    # Rimuovi i valori NaN e assicurati che i dati siano float32
-    data = cv2.flip(p.imn.astype(np.float32),0)
-    data[np.isnan(data)] = np.min(data[~np.isnan(data)])
-
-    # --- Calcolo Range Iniziale ---
-    data_min = np.min(data)
-    data_max = np.max(data)
-
-    print('data_min',data_min,'data_max',data_max)
-
-    if not(data_max>data_min):
-        messagebox.showwarning("Attenzione","L'elaborazione ha prodotto un'immagine monocromatica")
-        plt.imshow(data,'gray')
-        plt.show()
-        return
-    
-    # --- Variabili di Stato Locali ---
-    # Usiamo un wrapper per tenere traccia dello stato di Gamma
-    class State:
-        gamma_val = 1.0
-        img_data = data
-    
-    state = State()
-    
-
-    
-    
-
-    # --- Funzioni di Elaborazione (Nested) ---    
-    def normalizza_immagine( min_val, max_val):
-        """Esegue il clipping e lo stretching lineare [min_val, max_val] -> [0.0, 1.0]."""
+        imn[i, :] = 1024.0 * im_cropped[i, :] - 192.0 * total_sumedg_row - 64.0 * total_sumcrn_row
         
-        img_clippata = np.clip(data, min_val, max_val)
-        range_attuale = max_val - min_val
-
-        if range_attuale <= 0:
-            return np.zeros_like(data, dtype=np.float32)
-        
-        # Stretching lineare a 0.0-1.0 float
-        return (img_clippata - min_val) / range_attuale 
-    
-
-    
-
-
-    def applica_gamma(img_normalized, gamma):
-        """Applica la correzione Gamma (I_out = I_in ^ gamma)."""
-        gamma = max(0.001, gamma)
-        # Applica la formula: I_out = I_in ^ gamma
-        return np.power(img_normalized, gamma)
-
-    
-
-    # --- Configurazione della Figura e degli Assi ---
-    fig, ax = plt.subplots(figsize=(8, 8))
-    # Lascia spazio a destra per lo slider verticale
-    plt.subplots_adjust(left=0.05, right=0.85, bottom=0.1) 
-
-    # 1. Visualizzazione Iniziale (Usa dati iniziali, verrà aggiornata dalla prima chiamata a update_image)
-    im = ax.imshow(np.zeros_like(state.img_data, dtype=np.float32), cmap='gray', vmin=0, vmax=1)
-    ax.set_title(f"Immagine FITS (Gamma: {state.gamma_val:.2f})")
-    ax.axis('off')
-
-    # 2. Creazione del Range Slider Verticale (Min/Max)
-    ax_range_slider = plt.axes([0.9, 0.1, 0.03, 0.8]) # Posizionato a destra
-    ax_range_slider.set_ylim(data_min, data_max)
-    cmap_gradient = get_cmap('binary') 
-    gradient_data = np.linspace(0, 1, 100).reshape(-1, 1)
-
-    # Aggiunge il gradiente come sfondo della traccia
-    ax_range_slider.imshow(
-        gradient_data,
-        aspect='auto',
-        cmap=cmap_gradient,
-        origin='lower',
-        extent=[0, 1, data_min, data_max]
-    )
-    ax_range_slider.set_xticks([]); ax_range_slider.set_yticks([])
-    for spine in ax_range_slider.spines.values():
-        spine.set_visible(False)
-    ax_range_slider.set_facecolor('none')
-    slider_range = RangeSlider(
-        ax_range_slider, 
-        'Livelli Min/Max', 
-        data_min, 
-        data_max,
-        valinit=(data_min,data_max),
-        valstep=(data_max-data_min)/1000,
-        orientation="vertical",
-        track_color='none' # Colore della traccia del cursore (non della barra intera)
-    )
-    print(data_min, data_max)
-    print("SL VALS",slider_range.val)
-    
-    # Nasconde la barra colorata tra i manici
-    slider_range.poly.set_facecolor('none')
-    slider_range.poly.set_edgecolor('none')
-
-
-    def update_image(val):
-        """Aggiorna l'immagine quando lo slider Min/Max viene mosso."""
-        
-        # Ottiene i valori Min e Max dal RangeSlider
-        min_val, max_val = slider_range.val
-        
-        # Esegue lo stretching
-        img_float_0_1 = normalizza_immagine(min_val, max_val)
-        
-        # Applica la correzione Gamma
-        img_final = applica_gamma(img_float_0_1, state.gamma_val)
-        
-        # Aggiorna i dati mostrati sull'asse
-        im.set_data(img_final)
-        
-        # Forza il ridisegno della figura
-        fig.canvas.draw_idle()
-
-    def scroll_gamma(event):
-        """Callback per la rotellina del mouse (scroll) per la correzione Gamma."""
-        
-        # 'up' o 'down' indica la direzione dello scroll
-        if event.button == 'up':
-            state.gamma_val = min(5.0, state.gamma_val + gamma_step)
-        elif event.button == 'down':
-            state.gamma_val = max(0.1, state.gamma_val - gamma_step)
-        else:
-            return
-        
-        # Aggiorna l'immagine con il nuovo valore Gamma
-        update_image(slider_range.val)
-        
-        # Aggiorna il titolo per mostrare il valore Gamma corrente
-        ax.set_title(f"Gamma: {state.gamma_val:.2f}")
-        fig.canvas.draw_idle()
-
-    ax_button = fig.add_axes([0.7, 0.05, 0.1, 0.05])
-    button = Button(ax_button, 'SAVE')
-    def save(event):
-        print('SALVATAGGIO')
-        save_enhanced_image(p)
-
-    button.on_clicked(save)
-
-    # 3. Connessione degli Eventi
-    slider_range.on_changed(update_image)
-    fig.canvas.mpl_connect('scroll_event', scroll_gamma)
-
-    # 4. Avvio Iniziale e Display
-    print("\nVisualizzatore FITS Interattivo Avviato:")
-    print("  - Trascina i manici dello slider (a destra) per lo Stretching Min/Max.")
-    print("  - Scorri la rotellina del mouse sopra l'immagine per regolare il Gamma.")
-    update_image(None) # Chiama la funzione una volta per visualizzare l'immagine iniziale
-    plt.show()
-
-
-def save_enhanced_image(p:Params):
-    directory_path = os.path.basename(p.input_path)
-    temp = p.input_path.split('.',1)
-    print(temp)
-    extension = temp[1]
-    name=temp[0]
-    print(name,extension)
-    out_path_recommended = name+"_enhanced"+"_"+p.option
-    if p.option == OPTIONS[0]:
-        out_path_recommended=out_path_recommended+"_nrad_"+str(p.nrad)+"_ntheta_"+str(p.ntheta)+"_stdtheta_"+str(1/p.rejsig)+"_"
-    if p.option == OPTIONS [1]:
-        out_path_recommended=out_path_recommended+"_nrad_"+str(p.nrad)+"_ntheta_"+str(p.ntheta)+"_"
-    if p.option == OPTIONS [3]:
-        out_path_recommended=name+"_enhanced"+"Division by 1_rho profile"+"_nrad_"+str(p.nrad)+"_ntheta_"+str(p.ntheta)+"_"
-    if p.option == OPTIONS[2]:
-        out_path_recommended=out_path_recommended+"_nrad_"+str(p.nrad)+"_ntheta_"+str(p.ntheta)+"_stdtheta_"+str(1/p.rejsig)+"_nsig_"+str(p.nsig)+"_"
-    if p.option == OPTIONS[4]:
-        out_path_recommended=out_path_recommended+"_A_"+str(p.A)+"_B_"+str(p.B)+"_N_"+str(p.N)+"_NUMLOG_"+str(p.NUMLOG)+"_"
-
-    
-
-    #root = tk.Tk()
-    #root.withdraw() # Nasconde la finestra principale vuota
-
-    # 2. Definisci i tipi di file filtrabili
-    filetypes = [("Immagini FITS", "*.fit *.fits")] 
-    
-    # 3. Apri la finestra di dialogo "Salva con nome"
-    filepath = fd.asksaveasfilename(
-        title='Salva il file come...',
-        initialdir=directory_path,       # Directory iniziale (es. radice del sistema)
-        initialfile=out_path_recommended,
-        defaultextension="."+extension, # Estensione predefinita se l'utente non la specifica
-        filetypes=filetypes
-    )
-    if not filepath:
-        print("Saving Aborted")
-        return
-    p.hdul[0].data = p.imn
-    p.hdul[0].header['DATAMIN']=np.min(p.imn)
-    p.hdul[0].header['AVISUMIN']=np.min(p.imn)
-    p.hdul[0].header['DATAMAX']=np.max(p.imn)
-    p.hdul[0].header['AVISUMAX']=np.max(p.imn)
-
-    p.hdul[0].header['INP_IM']=(p.input_path,'input image name')
-    p.hdul[0].header['NUC-X']=(p.xnuc,'optocenter X pixel value')
-    p.hdul[0].header['NUC-Y']=(p.ynuc,'optocenter Y pixel value')
-
-
-          
-        
-    if p.option ==OPTIONS[4]:
-        if p.NUMLOG:
-            p.hdul[0].header['NUMLOG']=(1,'numlog=1 => logarithmic image')
-        else:
-            p.hdul[0].header['NUMLOG']=(0,'numlog ne 1 => no logarithmic image')
-        p.hdul[0].header['A']=(p.A,'coeffcicent a')
-        p.hdul[0].header['B']=(p.B,'coefficent b')
-        
-        p.hdul[0].header['A']=(p.A,'coeffcicent a')
-    else:
-        p.hdul[0].header['ENH-RAD']=(p.nrad,'diameter=1+(2*radius)')
+    return imn
 
 
 
 
-    p.hdul.writeto(filepath,overwrite=True)
+
+
+
 

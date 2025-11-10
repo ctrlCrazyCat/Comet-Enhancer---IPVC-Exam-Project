@@ -1,19 +1,38 @@
 import tkinter as tk
-from tkinter import filedialog, messagebox, ttk,font as tkFont
+from tkinter import filedialog , messagebox, ttk,font as tkFont
 
 from astropy.io import fits
 import matplotlib.pyplot as plt
-from comet_pack import Params
+import cv2
+import os
 import comet_pack
 import numpy as np
-from matplotlib.widgets import RangeSlider, Slider
-import os
+
 from matplotlib.cm import get_cmap
 import matplotlib
 import sys
+import matplotlib.pyplot as plt
+from matplotlib.widgets import RangeSlider,Button
+from matplotlib.cm import get_cmap
+import tkinter as tk
+
 matplotlib.use('TkAgg')
 
 from tooltip import Tooltip
+
+
+class Params:
+    def __init__(self):
+        return
+
+OPTIONS = [
+            'Division by Azimuthal Average',
+            'Division by Azimuthal Median',
+            'Azimuthal Renormalization',
+            'Division by 1/rho profile',
+            'Radially Variable Spatial Filtering'
+        ]
+
 
 def conditional_config(entry_widget_info,configuration):
         (condition,text) = configuration
@@ -49,6 +68,7 @@ class ImageProcessingGUI:
         self.image_path = None
         self.image_width = 0
         self.image_height = 0
+        self.log_abeled = True
         
         # Aggiungi una variabile per tenere traccia se il submit è avvenuto con successo
         self.submitted_successfully = False
@@ -77,8 +97,8 @@ class ImageProcessingGUI:
 
         # --- Variabile per il Combobox ---
         self.combobox_choice = tk.StringVar()
-        self.options = comet_pack.get_options()
-        self.combobox_choice.set(self.options[0])
+        
+        self.combobox_choice.set(OPTIONS[0])
 
         # --- Tracciamento delle modifiche nelle caselle di testo (tutte le variabili) ---
         self.center_x_var.trace("w", self._validate_all_inputs)
@@ -161,7 +181,7 @@ class ImageProcessingGUI:
         # Combobox
         self.style = ttk.Style()
         self.style.configure('TCombobox', fieldbackground='white', background='lightgrey')
-        self.combobox = ttk.Combobox(root, textvariable=self.combobox_choice, values=self.options, state='readonly', width=40,cursor="hand2")
+        self.combobox = ttk.Combobox(root, textvariable=self.combobox_choice, values=OPTIONS, state='readonly', width=40,cursor="hand2")
         self.combobox.bind("<<ComboboxSelected>>", self._on_combobox_selected_event_for_bind)
         self.combobox.pack(pady=10)
 
@@ -232,19 +252,19 @@ class ImageProcessingGUI:
 
         # Mappa le opzioni ai widget necessari e alla loro riga di griglia
         self.option_to_widgets_config = {
-            self.options[0]: [ # Division by Azimuthal Average
+            OPTIONS[0]: [ # Division by Azimuthal Average
                 ("rho_pixels", 0), ("theta_pixels", 1), ("std_dev_theta", 2)
             ],
-            self.options[1]: [ # Division by Azimuthal Median
+            OPTIONS[1]: [ # Division by Azimuthal Median
                 ("rho_pixels", 0), ("theta_pixels", 1)
             ],
-            self.options[2]: [ # Azimuthal Renormalization
+            OPTIONS[2]: [ # Azimuthal Renormalization
                 ("rho_pixels", 0), ("theta_pixels", 1), ("std_dev_theta", 2), ("min_max_std_dev", 3)
             ],
-            self.options[3]: [ # Division by 1/rho profile  
+            OPTIONS[3]: [ # Division by 1/rho profile  
                 #("rho_pixels", 0), ("theta_pixels", 1)
             ],
-            self.options[4]: [ # Radially Variable Spatial Filtering
+            OPTIONS[4]: [ # Radially Variable Spatial Filtering
                 ("kernel_a_term", 0), ("kernel_b_term", 1), ("kernel_n_term", 2), ("transform_log", 3)
             ]
         }
@@ -269,11 +289,11 @@ class ImageProcessingGUI:
         
         o.ynuc=float(self.entry_center_y.get())-1.0
         o.xnuc=float(self.entry_center_x.get())-1.0
-        [hdul,imold,log_abeled]=comet_pack.get_input_data(self.image_path)
-        o.hdul = hdul
-        o.imold = imold
-        (o.NROW,o.NCOL)= imold.shape
-        if option==self.options[0]:
+        #[hdul,imold,log_abeled]=comet_pack.get_input_data(self.image_path)
+        o.hdul=self.hdul
+        (o.NROW,o.NCOL)= self.imold.shape
+        
+        if option==OPTIONS[0]:
             o.nrad=int(self.rho_pixels_var.get())
             o.ntheta=int(self.theta_pixels_var.get())
 
@@ -282,17 +302,17 @@ class ImageProcessingGUI:
             except ZeroDivisionError as e:
                 o.rejsig = float('inf')
 
-        if selected_option == app.options[1]:
+        if selected_option == OPTIONS[1]:
             o.nrad=int(self.rho_pixels_var.get())
             o.ntheta=int(self.theta_pixels_var.get()) 
 
-        if option==self.options[2]:
+        if option==OPTIONS[2]:
             o.nrad=int(self.rho_pixels_var.get())
             o.ntheta=int(self.theta_pixels_var.get())
             o.rejsig=1/float(self.std_dev_theta_var.get())
             o.nsig=float(self.min_max_std_dev_var.get())
         
-        if option==self.options[4]:
+        if option==OPTIONS[4]:
             o.A = float(self.kernel_a_term_var.get())
             o.B = float(self.kernel_b_term_var.get())
             o.N = float(self.kernel_n_term_var.get())
@@ -308,13 +328,18 @@ class ImageProcessingGUI:
             filetypes=[("Immagini FITS", "*.fit *.fits")] # Modificato il filetype
         )
         if file_path:
+            print('QUI1')
             self.image_path = file_path
+            print('QUI2')
             try:
                 with fits.open(file_path) as hdul: #hdul,imold,_upper_,y_upper_lim
                     self.hdul = hdul.copy()
                     self.imold = hdul[0].data.copy()
                     self.image_width=hdul[0].header['NAXIS1']
                     self.image_height=hdul[0].header['NAXIS2']
+                    self.imold[np.isnan(self.imold)] = np.min(self.imold[~np.isnan(self.imold)])
+                    if np.min(self.imold)<=0:
+                        self.log_abeled = False
                     
                 self.image_info_label.config(text=f"Immagine: {self.image_path.split('/')[-1]} ({self.image_width}x{self.image_height})")
                 
@@ -372,7 +397,7 @@ class ImageProcessingGUI:
         selected_option = self.combobox_choice.get()
         print(selected_option,"AAA")
 
-        if selected_option == self.options[3]:
+        if selected_option == OPTIONS[3]:
             # Opzione [3]: Nascondi il frame
             self.conditional_params_frame.pack_forget()
         
@@ -393,6 +418,8 @@ class ImageProcessingGUI:
                 widget.grid(row=row_num, column=2, padx=5, pady=5, sticky="ew")
                 widget.config(state=tk.NORMAL)
                 guide.grid(row=row_num,column=3,padx=5,pady=5,sticky="ew")
+            if self.log_abeled==False:
+                self.conditional_widgets_map["transform_log"]["widget"].config(state=tk.DISABLED)
         else:
             # Caso fallback (es. opzione non in config, ma non è op[3])
             # o se l'opzione [3] non fosse gestita esplicitamente sopra
@@ -601,7 +628,7 @@ class ImageProcessingGUI:
         # Validazione dei campi condizionali attualmente visibili
         
         
-        if selected_option == self.options[0]: # Division by Azimuthal Average
+        if selected_option == OPTIONS[0]: # Division by Azimuthal Average
             rho_pixels_ok = self._validate_rho_input_and_approximate(all_center_ok)
             conditional_config(self.conditional_widgets_map["rho_pixels"]["info_label"],rho_pixels_ok)
             theta_pixels_ok = self._validate_int_input_and_approximate(self.theta_pixels_var, min_val=1)
@@ -617,7 +644,7 @@ class ImageProcessingGUI:
                 self.validations.theta_pixels_ok = theta_pixels_ok
                 self.validations.std_dev_theta_ok = std_dev_theta_ok
 
-        elif selected_option == self.options[1]: # Azimuthal Median / Division by 1/rho profile
+        elif selected_option == OPTIONS[1]: # Azimuthal Median / Division by 1/rho profile
             rho_pixels_ok = self._validate_rho_input_and_approximate(all_center_ok)
             conditional_config(self.conditional_widgets_map["rho_pixels"]["info_label"],rho_pixels_ok)
             theta_pixels_ok = self._validate_int_input_and_approximate(self.theta_pixels_var, min_val=1)
@@ -628,12 +655,12 @@ class ImageProcessingGUI:
             if not all_conditional_ok:
                 self.validations.rho_pixels_ok = rho_pixels_ok
                 self.validations.theta_pixels_ok = theta_pixels_ok
-        elif selected_option==self.options[3]:
+        elif selected_option==OPTIONS[3]:
             self.validations.option = 3
             all_conditional_ok = True
                 
             
-        elif selected_option == self.options[2]: # Azimuthal Renormalization
+        elif selected_option == OPTIONS[2]: # Azimuthal Renormalization
             rho_pixels_ok = self._validate_rho_input_and_approximate(all_center_ok)
             conditional_config(self.conditional_widgets_map["rho_pixels"]["info_label"],rho_pixels_ok)
             theta_pixels_ok = self._validate_int_input_and_approximate(self.theta_pixels_var, min_val=1)
@@ -653,7 +680,7 @@ class ImageProcessingGUI:
                 self.validations.min_max_std_dev_ok = min_max_std_dev_ok
 
 
-        elif selected_option == self.options[4]: # Radially Variable Spatial Filtering
+        elif selected_option == OPTIONS[4]: # Radially Variable Spatial Filtering
             kernel_a_ok = self._validate_double_input(self.kernel_a_term_var,min_val=0, allow_zero=False)
             conditional_config(self.conditional_widgets_map["kernel_a_term"]["info_label"],kernel_a_ok)
 
@@ -773,6 +800,245 @@ class ImageProcessingGUI:
     def run(self):
         self.root.mainloop() 
 
+
+
+
+def interactive_image_viewer(p:Params, gamma_step=0.05):
+    """
+    Mostra un'immagine astronomica in modo interattivo con controlli per lo stretching 
+    dei livelli (RangeSlider verticale) e la correzione Gamma (scroll del mouse).
+
+    Args:
+        image_data (np.ndarray): Array NumPy (2D) contenente i dati dell'immagine.
+        gamma_step (float): Il passo di incremento/decremento della correzione Gamma.
+    """
+    
+    # Rimuovi i valori NaN e assicurati che i dati siano float32
+    data = cv2.flip(p.imn.astype(np.float32),0)
+    data[np.isnan(data)] = np.min(data[~np.isnan(data)])
+
+    # --- Calcolo Range Iniziale ---
+    data_min = np.min(data)
+    data_max = np.max(data)
+
+    print('data_min',data_min,'data_max',data_max)
+
+    if not(data_max>data_min):
+        messagebox.showwarning("Attenzione","L'elaborazione ha prodotto un'immagine monocromatica")
+        plt.imshow(data,'gray')
+        plt.show()
+        return
+    
+    # --- Variabili di Stato Locali ---
+    # Usiamo un wrapper per tenere traccia dello stato di Gamma
+    class State:
+        gamma_val = 1.0
+        img_data = data
+    
+    state = State()
+    
+
+    
+    
+
+    # --- Funzioni di Elaborazione (Nested) ---    
+    def normalizza_immagine( min_val, max_val):
+        """Esegue il clipping e lo stretching lineare [min_val, max_val] -> [0.0, 1.0]."""
+        
+        img_clippata = np.clip(data, min_val, max_val)
+        range_attuale = max_val - min_val
+
+        if range_attuale <= 0:
+            return np.zeros_like(data, dtype=np.float32)
+        
+        # Stretching lineare a 0.0-1.0 float
+        return (img_clippata - min_val) / range_attuale 
+    
+
+    
+
+
+    def applica_gamma(img_normalized, gamma):
+        """Applica la correzione Gamma (I_out = I_in ^ gamma)."""
+        gamma = max(0.001, gamma)
+        # Applica la formula: I_out = I_in ^ gamma
+        return np.power(img_normalized, gamma)
+
+    
+
+    # --- Configurazione della Figura e degli Assi ---
+    fig, ax = plt.subplots(figsize=(8, 8))
+    # Lascia spazio a destra per lo slider verticale
+    plt.subplots_adjust(left=0.05, right=0.85, bottom=0.1) 
+
+    # 1. Visualizzazione Iniziale (Usa dati iniziali, verrà aggiornata dalla prima chiamata a update_image)
+    im = ax.imshow(np.zeros_like(state.img_data, dtype=np.float32), cmap='gray', vmin=0, vmax=1)
+    ax.set_title(f"Immagine FITS (Gamma: {state.gamma_val:.2f})")
+    ax.axis('off')
+
+    # 2. Creazione del Range Slider Verticale (Min/Max)
+    ax_range_slider = plt.axes([0.9, 0.1, 0.03, 0.8]) # Posizionato a destra
+    ax_range_slider.set_ylim(data_min, data_max)
+    cmap_gradient = get_cmap('binary') 
+    gradient_data = np.linspace(0, 1, 100).reshape(-1, 1)
+
+    # Aggiunge il gradiente come sfondo della traccia
+    ax_range_slider.imshow(
+        gradient_data,
+        aspect='auto',
+        cmap=cmap_gradient,
+        origin='lower',
+        extent=[0, 1, data_min, data_max]
+    )
+    ax_range_slider.set_xticks([]); ax_range_slider.set_yticks([])
+    for spine in ax_range_slider.spines.values():
+        spine.set_visible(False)
+    ax_range_slider.set_facecolor('none')
+    slider_range = RangeSlider(
+        ax_range_slider, 
+        'Livelli Min/Max', 
+        data_min, 
+        data_max,
+        valinit=(data_min,data_max),
+        valstep=(data_max-data_min)/1000,
+        orientation="vertical",
+        track_color='none' # Colore della traccia del cursore (non della barra intera)
+    )
+    print(data_min, data_max)
+    print("SL VALS",slider_range.val)
+    
+    # Nasconde la barra colorata tra i manici
+    slider_range.poly.set_facecolor('none')
+    slider_range.poly.set_edgecolor('none')
+
+
+    def update_image(val):
+        """Aggiorna l'immagine quando lo slider Min/Max viene mosso."""
+        
+        # Ottiene i valori Min e Max dal RangeSlider
+        min_val, max_val = slider_range.val
+        
+        # Esegue lo stretching
+        img_float_0_1 = normalizza_immagine(min_val, max_val)
+        
+        # Applica la correzione Gamma
+        img_final = applica_gamma(img_float_0_1, state.gamma_val)
+        
+        # Aggiorna i dati mostrati sull'asse
+        im.set_data(img_final)
+        
+        # Forza il ridisegno della figura
+        fig.canvas.draw_idle()
+
+    def scroll_gamma(event):
+        """Callback per la rotellina del mouse (scroll) per la correzione Gamma."""
+        
+        # 'up' o 'down' indica la direzione dello scroll
+        if event.button == 'up':
+            state.gamma_val = min(5.0, state.gamma_val + gamma_step)
+        elif event.button == 'down':
+            state.gamma_val = max(0.1, state.gamma_val - gamma_step)
+        else:
+            return
+        
+        # Aggiorna l'immagine con il nuovo valore Gamma
+        update_image(slider_range.val)
+        
+        # Aggiorna il titolo per mostrare il valore Gamma corrente
+        ax.set_title(f"Gamma: {state.gamma_val:.2f}")
+        fig.canvas.draw_idle()
+
+    ax_button = fig.add_axes([0.7, 0.05, 0.1, 0.05])
+    button = Button(ax_button, 'SAVE')
+    def save(event):
+        print('SALVATAGGIO')
+        save_enhanced_image(p)
+
+    button.on_clicked(save)
+
+    # 3. Connessione degli Eventi
+    slider_range.on_changed(update_image)
+    fig.canvas.mpl_connect('scroll_event', scroll_gamma)
+
+    # 4. Avvio Iniziale e Display
+    print("\nVisualizzatore FITS Interattivo Avviato:")
+    print("  - Trascina i manici dello slider (a destra) per lo Stretching Min/Max.")
+    print("  - Scorri la rotellina del mouse sopra l'immagine per regolare il Gamma.")
+    update_image(None) # Chiama la funzione una volta per visualizzare l'immagine iniziale
+    plt.show()
+
+
+def save_enhanced_image(p:Params):
+    directory_path = os.path.basename(p.input_path)
+    temp = p.input_path.split('.',1)
+    print(temp)
+    extension = temp[1]
+    name=temp[0]
+    print(name,extension)
+    out_path_recommended = name+"_enhanced"+"_"+p.option
+    if p.option == OPTIONS[0]:
+        out_path_recommended=out_path_recommended+"_nrad_"+str(p.nrad)+"_ntheta_"+str(p.ntheta)+"_stdtheta_"+str(1/p.rejsig)+"_"
+    if p.option == OPTIONS [1]:
+        out_path_recommended=out_path_recommended+"_nrad_"+str(p.nrad)+"_ntheta_"+str(p.ntheta)+"_"
+    if p.option == OPTIONS [3]:
+        out_path_recommended=name+"_enhanced"+"Division by 1_rho profile"
+    if p.option == OPTIONS[2]:
+        out_path_recommended=out_path_recommended+"_nrad_"+str(p.nrad)+"_ntheta_"+str(p.ntheta)+"_stdtheta_"+str(1/p.rejsig)+"_nsig_"+str(p.nsig)+"_"
+    if p.option == OPTIONS[4]:
+        out_path_recommended=out_path_recommended+"_A_"+str(p.A)+"_B_"+str(p.B)+"_N_"+str(p.N)+"_NUMLOG_"+str(p.NUMLOG)+"_"
+
+    
+
+    #root = tk.Tk()
+    #root.withdraw() # Nasconde la finestra principale vuota
+
+    # 2. Definisci i tipi di file filtrabili
+    filetypes = [("Immagini FITS", "*.fit *.fits")] 
+    
+    # 3. Apri la finestra di dialogo "Salva con nome"
+    filepath = filedialog.asksaveasfilename(
+        title='Salva il file come...',
+        initialdir=directory_path,       # Directory iniziale (es. radice del sistema)
+        initialfile=out_path_recommended,
+        defaultextension="."+extension, # Estensione predefinita se l'utente non la specifica
+        filetypes=filetypes
+    )
+    if not filepath:
+        print("Saving Aborted")
+        return
+    p.hdul[0].data = p.imn
+    p.hdul[0].header['DATAMIN']=np.min(p.imn)
+    p.hdul[0].header['AVISUMIN']=np.min(p.imn)
+    p.hdul[0].header['DATAMAX']=np.max(p.imn)
+    p.hdul[0].header['AVISUMAX']=np.max(p.imn)
+
+    p.hdul[0].header['INP_IM']=(p.input_path,'input image name')
+    p.hdul[0].header['NUC-X']=(p.xnuc,'optocenter X pixel value')
+    p.hdul[0].header['NUC-Y']=(p.ynuc,'optocenter Y pixel value')
+
+
+          
+        
+    if p.option ==OPTIONS[4]:
+        if p.NUMLOG:
+            p.hdul[0].header['NUMLOG']=(1,'numlog=1 => logarithmic image')
+        else:
+            p.hdul[0].header['NUMLOG']=(0,'numlog ne 1 => no logarithmic image')
+        p.hdul[0].header['A']=(p.A,'coeffcicent a')
+        p.hdul[0].header['B']=(p.B,'coefficent b')
+        
+        p.hdul[0].header['A']=(p.A,'coeffcicent a')
+    elif p.option != OPTIONS[3]:
+        p.hdul[0].header['ENH-RAD']=(p.nrad,'diameter=1+(2*radius)')
+
+
+
+
+    p.hdul.writeto(filepath,overwrite=True)
+
+
+
+
 if __name__ == "__main__":
     try:
         root = tk.Tk()
@@ -801,49 +1067,52 @@ if __name__ == "__main__":
                 selected_option = app.combobox_choice.get()
                 
                 o=app.params_process(selected_option)
-                if selected_option == app.options[0]:
+                
+                (imold_preprocessed, xnuc_rel, ynuc_rel) = comet_pack.preprocess_and_normalize_crop(app.imold,o.xnuc,o.ynuc,o.x_lower_lim,o.x_upper_lim,o.y_lower_lim,o.y_upper_lim)
+                print(imold_preprocessed.shape,"GAUD")
+                if selected_option == OPTIONS[0]:
                     print(f"  Rho Pixels: {int(app.rho_pixels_var.get())}")
                     print(f"  Theta Pixels: {int(app.theta_pixels_var.get())}")
                     print(f"  Std Dev Theta: {float(app.std_dev_theta_var.get())}")
-                    print("SIZE",o.imold.shape)
-                    imun = comet_pack.polarize(o.imold,o.nrad,o.ntheta,o.xnuc,o.ynuc)            
-                    print("SIZE",imun.shape)
+                    #TODO: GESTIRE IL CROP
+                    #TODO: AGGIUNGERE CHE AL CROP IL NUCLEO DEVE STARE DENTRO
+                    imun = comet_pack.polarize(imold_preprocessed,o.nrad,o.ntheta,xnuc_rel,xnuc_rel)          
                     imien=comet_pack.azimuthal_average_division_vectorized(imun,o.rejsig)
-                    print("SIZE",imien.shape)
-                    o.imn=comet_pack.reconstruct_from_polar(imien,o.NCOL,o.NROW,o.xnuc,o.ynuc,o.x_lower_lim,o.x_upper_lim,o.y_lower_lim,o.y_upper_lim)
-                    print("SIZE",o.imn.shape)
-
-                elif selected_option == app.options[1]:
+                    
+                    o.imn=comet_pack.reconstruct_from_polar(imien,o.NCOL,o.NROW,xnuc_rel,ynuc_rel)
+                    
+                elif selected_option == OPTIONS[1]:
                     print(f"  Rho Pixels: {int(app.rho_pixels_var.get())}")
                     print(f"  Theta Pixels: {int(app.theta_pixels_var.get())}") 
-                    imiun = comet_pack.polarize(o.imold,o.nrad,o.ntheta,o.xnuc,o.ynuc)     
-                    imien = comet_pack.azimuthal_median_division_vectorized(imiun)
-                    o.imn=comet_pack.reconstruct_from_polar(imien,o.NCOL,o.NROW,o.xnuc,o.ynuc,o.x_lower_lim,o.x_upper_lim,o.y_lower_lim,o.y_upper_lim)
+                    
+                    imun = comet_pack.polarize(imold_preprocessed,o.nrad,o.ntheta,xnuc_rel,ynuc_rel)          
+                    imien = comet_pack.azimuthal_median_division_vectorized(imun) 
+                    o.imn=comet_pack.reconstruct_from_polar(imien,o.NCOL,o.NROW,xnuc_rel,ynuc_rel)
 
                         
                 
-                elif selected_option == app.options[2]:#RENORMALIZATION
+                elif selected_option == OPTIONS[2]:#RENORMALIZATION
                     print(f"  Rho Pixels: {int(app.rho_pixels_var.get())}")
                     print(f"  Theta Pixels: {int(app.theta_pixels_var.get())}")
                     print(f"  Std Dev Theta: {float(app.std_dev_theta_var.get())}")
                     print(f"  Min/Max Std Dev: {float(app.min_max_std_dev_var.get())}")
                     
-                    imiun = comet_pack.polarize(o.imold,o.nrad,o.ntheta,o.xnuc,o.ynuc)            
+                    imiun = comet_pack.polarize(imold_preprocessed,o.nrad,o.ntheta,xnuc_rel,ynuc_rel)            
                     imien=comet_pack.azimuthal_renormalization_vectorized(imiun,o.rejsig,o.nsig)
-                    o.imn=comet_pack.reconstruct_from_polar(imien,o.NCOL,o.NROW,o.xnuc,o.ynuc,o.x_lower_lim,o.x_upper_lim,o.y_lower_lim,o.y_upper_lim)
+                    o.imn=comet_pack.reconstruct_from_polar(imien,o.NCOL,o.NROW,xnuc_rel,ynuc_rel)
 
-                elif selected_option == app.options[3]:
-                    o.imn=comet_pack.inverserho_vectorized(o.imold,o.xnuc,o.ynuc,o.x_lower_lim,o.x_upper_lim,o.y_lower_lim,o.y_upper_lim)    
+                elif selected_option == OPTIONS[3]:
+                    o.imn=comet_pack.inverserho_vectorized(imold_preprocessed,xnuc_rel,ynuc_rel,o.NCOL,o.NROW)    
 
-                elif selected_option == app.options[4]:
+                elif selected_option == OPTIONS[4]:
                     print(f"  Kernel A Term: {float(app.kernel_a_term_var.get())}")
                     print(f"  Kernel B Term: {float(app.kernel_b_term_var.get())}")
                     print(f"  Kernel N Term: {float(app.kernel_n_term_var.get())}")
                     print(f"  Transform Log: {app.transform_log_var.get()}")
-                    o.imn = comet_pack.radially_variable_spatial_filtering_vectorized(o.imold,o.A,o.B,o.N,o.NUMLOG,o.xnuc,o.ynuc,o.x_lower_lim,o.x_upper_lim,o.y_lower_lim,o.y_upper_lim)
+                    o.imn = comet_pack.radially_variable_spatial_filtering_vectorized(app.imold,o.A,o.B,o.N,o.NUMLOG,o.xnuc,o.ynuc,o.x_lower_lim,o.x_upper_lim,o.y_lower_lim,o.y_upper_lim)
                 app.submit_button.config(state=tk.DISABLED,cursor="arrow")
                 #print("SHAPE USCITA",o.imn.shape) 
-                comet_pack.interactive_image_viewer(o)
+                interactive_image_viewer(o)
                 #TODO: GESTIRE ERRORE DI CHIUSURA APP PRIMA DEL VISUALIZZATORE
                 #ho notato che se si chiama interactive_image_viewer senza cambiare stato al bottone
                 #l'applicazione continua a lavorare
