@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 from matplotlib.widgets import RangeSlider,Button
 from matplotlib.cm import get_cmap
 import tkinter as tk
+import web_guide
 
 matplotlib.use('TkAgg')
 
@@ -120,11 +121,23 @@ class ImageProcessingGUI:
         # --- Creazione dei Widget ---
 
         # Pulsante per scegliere l'immagine
-        self.select_image_button = tk.Button(root, text="Scegli Immagine FIT/FITS", command=self._select_image,cursor="hand2") # Modificato il testo
-        self.select_image_button.pack(pady=10)
+        self.upper_frame = ttk.Frame(root)
+        self.upper_frame.pack(pady=10,padx=10,fill=tk.X)
 
-        self.image_info_label = tk.Label(root, text="Nessuna immagine selezionata.")
-        self.image_info_label.pack(pady=5)
+        
+        self.select_image_button = tk.Button(self.upper_frame, text="Scegli Immagine FIT/FITS", command=self._select_image,cursor="hand2") # Modificato il testo
+        self.select_image_button.grid(column=0,row=0,padx=2,pady=5,sticky="w")
+        
+        
+        self.image_info_label = tk.Label(self.upper_frame, text="Nessuna immagine selezionata.")
+        self.image_info_label.grid(column=1,row=0,padx=2,pady=5,sticky="w")
+
+
+        self.guide_button = tk.Button(self.upper_frame,text="Consulta una guida", command=self._open_guide_window,cursor="hand2")
+        self.guide_button.grid(column=0,row=1,padx=2,pady=5,sticky="w")
+
+
+
 
         # Frame per i valori del Centro (Double)
         self.center_frame = ttk.LabelFrame(root, text="Centro Nucleo Cometa (X, Y - double)")
@@ -274,6 +287,8 @@ class ImageProcessingGUI:
 
         # Inizializzazione degli stati
         self._validate_all_inputs()
+    def _open_guide_window(self):
+        web_guide.apri_finestra_link(self.root)
     def params_process(self,option):
         o = Params
         if self.image_path:
@@ -336,8 +351,11 @@ class ImageProcessingGUI:
                     self.image_height=hdul[0].header['NAXIS2']
                     self.imold[np.isnan(self.imold)] = np.min(self.imold[~np.isnan(self.imold)])
 
-                    
-                self.image_info_label.config(text=f"Immagine: {self.image_path.split('/')[-1]} ({self.image_width}x{self.image_height})")
+                image_name = self.image_path.split('/')[-1]
+                if len(image_name)>50:
+                    image_name = image_name[0:50]
+                    image_name=image_name+"..."   
+                self.image_info_label.config(text=f"Immagine: {image_name} ({self.image_width}x{self.image_height})")
                 
                 # Abilita TUTTE le caselle principali
                 self.entry_center_x.config(state=tk.NORMAL)
