@@ -61,7 +61,7 @@ def apri_finestra_link(root):
     text_widget.insert(tk.END, "https://cie.psi.edu/", "link1_tag")
     text_widget.insert(tk.END, " e pubblicati in ")
     text_widget.insert(tk.END, "questo articolo", "link2_tag")
-    text_widget.insert(tk.END, ".\n\nPer un approfondimento sugli algoritmi presentati cliclla il ")
+    text_widget.insert(tk.END, ".\n\nPer un approfondimento sugli algoritmi presentati vai al ")
     text_widget.insert(tk.END, "seguente link", "link3_tag")
     text_widget.insert(tk.END, ".")
     

@@ -41,7 +41,7 @@ if __name__ == "__main__":
                     print(f"  Std Dev Theta: {float(app.std_dev_theta_var.get())}")
                     
 
-                    imun = comet_pack.polarize(imold_preprocessed,o.nrad,o.ntheta,xnuc_rel,xnuc_rel)          
+                    imun = comet_pack.polarize(imold_preprocessed,o.nrad,o.ntheta,xnuc_rel,ynuc_rel)          
                     imien=comet_pack.azimuthal_average_division_vectorized(imun,o.rejsig)
                     
                     o.imn=comet_pack.reconstruct_from_polar(imien,o.NCOL,o.NROW,xnuc_rel,ynuc_rel)
