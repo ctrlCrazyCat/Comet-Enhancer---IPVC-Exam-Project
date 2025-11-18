@@ -1048,13 +1048,13 @@ def save_enhanced_image(p:Params):
     extension = temp[1]
     name=temp[0]
     
-    out_path_recommended = name+"_enhanced"+"_"+p.option
+    out_path_recommended = name+"_enhanced_"+p.option
     if p.option == OPTIONS[0]:
         out_path_recommended=out_path_recommended+"_nrad_"+str(p.nrad)+"_ntheta_"+str(p.ntheta)+"_stdtheta_"+str(1/p.rejsig)+"_"
     if p.option == OPTIONS [1]:
         out_path_recommended=out_path_recommended+"_nrad_"+str(p.nrad)+"_ntheta_"+str(p.ntheta)+"_"
     if p.option == OPTIONS [3]:
-        out_path_recommended=name+"_enhanced"+"Division by 1_rho profile"
+        out_path_recommended=name+"_enhanced_Division by 1_rho profile"
     if p.option == OPTIONS[2]:
         out_path_recommended=out_path_recommended+"_nrad_"+str(p.nrad)+"_ntheta_"+str(p.ntheta)+"_stdtheta_"+str(1/p.rejsig)+"_nsig_"+str(p.nsig)+"_"
     if p.option == OPTIONS[4]:
